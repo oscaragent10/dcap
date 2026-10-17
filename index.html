@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>DCAP</title>
+  <!-- Page d'enveloppe DCAP : page de premier niveau à nous (barre d'état parchemin, icône, plein écran),
+       qui affiche la web app Apps Script dans un cadre plein écran. Nécessite XFrameOptionsMode.ALLOWALL côté doGet. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="DCAP">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#EDE4D2">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/dcap-180.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <style>
+    html,body{margin:0;padding:0;height:100%;background:#EDE4D2;overflow:hidden;overscroll-behavior:none}
+    /* Bande fixe opaque en haut : iOS 26/27 en déduit une barre d'état unie couleur parchemin, sans flou
+       (élément fixe, à moins de 4 px du haut, ≥ 6 px de haut, ≥ 80 % de large). */
+    #top{position:fixed;top:0;left:0;right:0;height:max(env(safe-area-inset-top),8px);background:#EDE4D2;z-index:2}
+    #app{position:fixed;left:0;right:0;bottom:0;top:env(safe-area-inset-top);width:100%;height:calc(100% - env(safe-area-inset-top));border:0;display:block;background:#EDE4D2}
+    #fallback{position:fixed;inset:0;display:none;align-items:center;justify-content:center;font:14px ui-monospace,Menlo,monospace;color:#1F2422;text-align:center;padding:24px}
+    #fallback a{color:#2E9A55}
+  </style>
+</head>
+<body>
+  <div id="top" aria-hidden="true"></div>
+  <iframe id="app" title="DCAP" src="https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec" allow="clipboard-write; fullscreen"></iframe>
+  <div id="fallback">Le tableau de bord ne s'affiche pas ici.<br><a href="https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec" target="_blank" rel="noopener">Ouvrir DCAP directement</a></div>
+  <script>
+    // Filet de sécurité : si le cadre est refusé (X-Frame-Options), proposer le lien direct.
+    var f = document.getElementById('app'), ok = false;
+    f.addEventListener('load', function () { ok = true; });
+    setTimeout(function () { if (!ok) document.getElementById('fallback').style.display = 'flex'; }, 20000);
+  </script>
+</body>
+</html>
