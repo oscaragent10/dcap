@@ -18,14 +18,19 @@
     html,body{margin:0;padding:0;height:100%;background:#EDE4D2;overflow:hidden;overscroll-behavior:none}
     /* Bande fixe opaque en haut : iOS 26/27 en déduit une barre d'état unie couleur parchemin, sans flou
        (élément fixe, à moins de 4 px du haut, ≥ 6 px de haut, ≥ 80 % de large). */
-    #top{position:fixed;top:0;left:0;right:0;height:max(env(safe-area-inset-top),8px);background:#EDE4D2;z-index:2}
-    #app{position:fixed;left:0;right:0;bottom:0;top:env(safe-area-inset-top);width:100%;height:calc(100% - env(safe-area-inset-top));border:0;display:block;background:#EDE4D2}
+    /* Une seule gestion du haut : la bande occupe la zone sûre (ou 6 px si iOS place déjà la page sous la barre d'état,
+       cas « status-bar-style: default ») et le cadre commence JUSTE en dessous. L'app intégrée n'ajoute aucune marge haute. */
+    :root{--top:max(env(safe-area-inset-top),6px)}
+    #top{position:fixed;top:0;left:0;right:0;height:var(--top);background:#EDE4D2;z-index:2}
+    #app{position:fixed;left:0;right:0;top:var(--top);width:100%;height:calc(100% - var(--top));border:0;display:block;background:#EDE4D2}
+    #probe{position:fixed;left:0;top:0;width:0;visibility:hidden;height:env(safe-area-inset-bottom)}
     #fallback{position:fixed;inset:0;display:none;align-items:center;justify-content:center;font:14px ui-monospace,Menlo,monospace;color:#1F2422;text-align:center;padding:24px}
     #fallback a{color:#2E9A55}
   </style>
 </head>
 <body>
   <div id="top" aria-hidden="true"></div>
+  <div id="probe"></div>
   <iframe id="app" title="DCAP" src="https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec" allow="clipboard-write; fullscreen"></iframe>
   <div id="fallback">Le tableau de bord ne s'affiche pas ici.<br><a href="https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec" target="_blank" rel="noopener">Ouvrir DCAP directement</a></div>
   <script>
@@ -33,6 +38,52 @@
     var f = document.getElementById('app'), ok = false;
     f.addEventListener('load', function () { ok = true; });
     setTimeout(function () { if (!ok) document.getElementById('fallback').style.display = 'flex'; }, 20000);
+
+    // Pont avec l'app. Chaîne de cadres : cette page → script.google.com (/exec) → sandbox *.googleusercontent.com
+    // → userHtmlFrame (même origine que la sandbox, c'est là que tourne l'app). L'app écrit à window.top ;
+    // on répond directement à event.source (sa fenêtre), sans repasser par les cadres intermédiaires.
+    var APP_ORIGIN = /^https:\/\/[a-z0-9-]+-script\.googleusercontent\.com$/;
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var rec = null, peer = null;
+    function post(m) { if (peer) peer.w.postMessage(Object.assign({ dcap: 1 }, m), peer.o); }
+    function env() {
+      return { type: 'env', wrapper: true, bottom: document.getElementById('probe').offsetHeight || 0,
+        standalone: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches, speech: !!SR };
+    }
+    function startRec() {
+      if (rec) return;
+      try {
+        rec = new SR(); rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
+        rec.onstart = function () { post({ type: 'speech-start' }); };
+        rec.onresult = function (e) {
+          var fin = '', tmp = '';
+          for (var i = 0; i < e.results.length; i++) (e.results[i].isFinal ? (fin += e.results[i][0].transcript) : (tmp += e.results[i][0].transcript));
+          post({ type: 'speech', text: (fin + tmp).replace(/\s+/g, ' ').trim(), interim: !!tmp });
+        };
+        rec.onerror = function (e) { post({ type: 'speech-error', error: e.error || 'error' }); };
+        rec.onend = function () { rec = null; post({ type: 'speech-end' }); };
+        rec.start();
+      } catch (err) { rec = null; post({ type: 'speech-error', error: String(err && err.name || err) }); post({ type: 'speech-end' }); }
+    }
+    window.addEventListener('message', function (e) {
+      var m = e.data;
+      if (!m || m.dcap !== 1 || !APP_ORIGIN.test(e.origin) || !e.source) return;
+      peer = { w: e.source, o: e.origin };
+      if (m.type === 'hello') post(env());
+      else if (m.type === 'mic-start' && SR) startRec();
+      else if (m.type === 'mic-stop' && rec) rec.stop();
+    });
+    window.addEventListener('resize', function () { post(env()); });
+
+    // Clavier iOS : garder le cadre à la hauteur visible (pas de page qui glisse vers le haut et coupe l'en-tête).
+    if (window.visualViewport) {
+      var fit = function () {
+        var top = document.getElementById('top').offsetHeight, vh = window.visualViewport.height;
+        f.style.height = Math.max(200, Math.round(vh - top)) + 'px';
+        if (window.scrollY) window.scrollTo(0, 0);
+      };
+      visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit);
+    }
   </script>
 </body>
 </html>
