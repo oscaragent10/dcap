@@ -26,12 +26,21 @@
     #probe{position:fixed;left:0;top:0;width:0;visibility:hidden;height:env(safe-area-inset-bottom)}
     #fallback{position:fixed;inset:0;display:none;align-items:center;justify-content:center;font:14px ui-monospace,Menlo,monospace;color:#1F2422;text-align:center;padding:24px}
     #fallback a{color:#2E9A55}
+    /* Feuille « Activer les notifications » : l'invite iOS n'est permise qu'après un appui dans l'app installée (cette page). */
+    #notif{position:fixed;left:0;right:0;bottom:0;z-index:5;display:none;background:#FFFBF1;border-top:1px solid #D9CDB4;box-shadow:0 -8px 24px rgba(31,36,34,.12);
+      padding:16px 18px calc(16px + env(safe-area-inset-bottom));font:14px/1.4 -apple-system,system-ui,sans-serif;color:#1F2422}
+    #notif.on{display:block} #notif b{display:block;font-size:16px;margin-bottom:4px}
+    #notif .row{display:flex;gap:10px;margin-top:12px}
+    #notif button{flex:1;min-height:46px;border-radius:10px;font:600 15px -apple-system,system-ui,sans-serif;border:1px solid #D9CDB4;background:#fff;color:#1F2422}
+    #notif button.go{background:#3DBB6A;border-color:#2E9A55;color:#fff}
   </style>
 </head>
 <body>
   <div id="top" aria-hidden="true"></div>
   <div id="probe"></div>
   <iframe id="app" title="DCAP" src="https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec" allow="clipboard-write; fullscreen"></iframe>
+  <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
+    <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <div id="fallback">Le tableau de bord ne s'affiche pas ici.<br><a href="https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec" target="_blank" rel="noopener">Ouvrir DCAP directement</a></div>
   <script>
     // Filet de sécurité : si le cadre est refusé (X-Frame-Options), proposer le lien direct.
@@ -48,7 +57,7 @@
     function post(m) { if (peer) peer.w.postMessage(Object.assign({ dcap: 1 }, m), peer.o); }
     function env() {
       return { type: 'env', wrapper: true, bottom: document.getElementById('probe').offsetHeight || 0,
-        standalone: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches, speech: !!SR };
+        standalone: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches, speech: !!SR, push: pushState() };
     }
     function startRec() {
       if (rec) return;
@@ -65,11 +74,48 @@
         rec.start();
       } catch (err) { rec = null; post({ type: 'speech-error', error: String(err && err.name || err) }); post({ type: 'speech-end' }); }
     }
+
+    // ---- Notifications Web Push (iOS 16.4+ : uniquement dans l'app ajoutée à l'écran d'accueil)
+    var VAPID_PUBLIC = 'BE1MgRR6LQIOe6JiooFfUj4A66TPdx80NKHfnQFmZNfHen0Gj2ANEBEXqvqtBI2OT5p1g_KQHCunW72sQrZB4DI';
+    var STANDALONE = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+    var PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    var swReg = PUSH_OK ? navigator.serviceWorker.register('sw.js').catch(function () { return null; }) : Promise.resolve(null);
+    function pushState() { return PUSH_OK ? Notification.permission : (STANDALONE ? 'unsupported' : 'need-install'); }
+    function b64u(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
+    function sendSub(fresh) {
+      return swReg.then(function (reg) { return reg ? navigator.serviceWorker.ready : null; }).then(function (reg) {
+        if (!reg) throw new Error('service worker indisponible');
+        return reg.pushManager.getSubscription().then(function (s) { return s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID_PUBLIC) }); });
+      }).then(function (sub) { post({ type: 'push-sub', sub: sub.toJSON(), ua: navigator.userAgent, fresh: !!fresh }); post({ type: 'push-state', push: 'granted' }); });
+    }
+    var sheet = document.getElementById('notif');
+    function showSheet() { if (PUSH_OK && Notification.permission === 'default') sheet.classList.add('on'); }
+    document.getElementById('notif-later').onclick = function () { sheet.classList.remove('on'); try { localStorage.setItem('dcap-notif-later', String(Date.now())); } catch (e) {} };
+    document.getElementById('notif-go').onclick = function () {
+      sheet.classList.remove('on');
+      // appel direct dans le geste (exigence iOS)
+      Notification.requestPermission().then(function (p) {
+        post({ type: 'push-state', push: p });
+        if (p === 'granted') return sendSub(true);
+      }).catch(function (err) { post({ type: 'push-error', error: String(err && err.message || err) }); });
+    };
+    // toucher une notification alors que l'app est déjà ouverte : le worker nous prévient → on ouvre le Coach
+    if (PUSH_OK) navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.type === 'open-coach') { if (peer) post({ type: 'open-coach' }); else wantCoach = true; } });
+    var wantCoach = /[?&]tab=coach\b/.test(location.search);
+    if (wantCoach && history.replaceState) history.replaceState(null, '', location.pathname);
+    // première ouverture de l'app installée : proposer une fois (puis via 🔔 dans le Coach)
+    if (STANDALONE && PUSH_OK && Notification.permission === 'default') { var later = 0; try { later = +localStorage.getItem('dcap-notif-later') || 0; } catch (e) {} if (Date.now() - later > 7 * 864e5) setTimeout(showSheet, 2500); }
     window.addEventListener('message', function (e) {
       var m = e.data;
       if (!m || m.dcap !== 1 || !APP_ORIGIN.test(e.origin) || !e.source) return;
       peer = { w: e.source, o: e.origin };
-      if (m.type === 'hello') post(env());
+      if (m.type === 'hello') {
+        post(env());
+        if (wantCoach) { wantCoach = false; post({ type: 'open-coach' }); }
+        if (PUSH_OK && Notification.permission === 'granted') sendSub(false).catch(function () {}); // rafraîchit l'abonnement dans le Sheet
+      }
+      else if (m.type === 'notif-ui') showSheet();
+      else if (m.type === 'badge' && navigator.setAppBadge) { (m.n ? navigator.setAppBadge(m.n) : navigator.clearAppBadge()).catch(function () {}); }
       else if (m.type === 'mic-start' && SR) startRec();
       else if (m.type === 'mic-stop' && rec) rec.stop();
     });
