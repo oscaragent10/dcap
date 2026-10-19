@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>DCAP · sélecteur RPE (maquettes)</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--parchment:#EDE4D2;--ink:#1F2422;--ink-2:#4A4F4C;--muted:#7C7A72;--green:#3DBB6A;--green-d:#2E9A55;--gold:#E8A830;--danger:#D64545;--line:#D9CFBC;--line-2:#ECE6DA;--gym:#E9C23A;--gym-d:#9A7A0C;
+  --head:'Barlow Condensed','Arial Narrow',sans-serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,monospace}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--parchment);color:var(--ink);font-family:var(--mono);overscroll-behavior:none}
+header{padding:14px 14px 4px;font-family:var(--head)} header h1{margin:0;font-size:24px;font-weight:900;letter-spacing:.03em}
+header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.tabs{display:flex;gap:6px;padding:8px 14px}
+.tabs button{flex:1;font:600 12px var(--mono);padding:8px 4px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+.tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.card{background:#fff;border:1px solid var(--line);border-radius:6px;margin:10px 14px;padding:10px 10px 12px}
+.gx-name{font-family:var(--head);font-weight:700;font-size:20px;line-height:1.1}
+.gx-obj{font-size:13px;font-weight:600;margin-top:2px} .gx-prev{font-size:10.5px;color:var(--muted);margin-top:1px}
+.sets{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.set{display:flex;align-items:center;gap:6px;padding:4px;border:1px solid var(--line-2);border-radius:6px;background:#FBF8F2;font-size:17px;font-weight:600}
+.set.done{background:#E9F6EE;border-color:#BFE3CB}
+.set .n{font-size:11px;color:var(--muted);width:12px;text-align:center;font-weight:400}
+.set .grp{display:flex;align-items:center;gap:2px;flex:1} .set b{min-width:30px;text-align:center}
+.set small{font-size:9px;color:var(--muted);font-weight:400}
+.set .bt{width:28px;height:32px;border:1px solid var(--line);background:#fff;border-radius:5px;font-size:17px;display:flex;align-items:center;justify-content:center;font-weight:400}
+.set .ok{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:16px;background:#fff}
+.set.done .ok{background:var(--green);border-color:var(--green-d);color:#fff}
+.rpe-lab{display:flex;justify-content:space-between;align-items:baseline;margin-top:12px}
+.mono-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.variant{display:none} .variant.on{display:block}
+.note{margin:4px 14px 30px;font-size:11px;color:var(--ink-2);line-height:1.45}
+
+/* 1 — règle graduée */
+.r1-val{text-align:center;font-family:var(--head);font-weight:900;font-size:46px;line-height:1;margin-top:4px}
+.r1-val small{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--muted);display:block;letter-spacing:.06em;margin-top:2px}
+.r1{position:relative;margin-top:6px;height:62px}
+.r1-sc{position:absolute;inset:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  mask-image:linear-gradient(90deg,transparent,#000 22%,#000 78%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 22%,#000 78%,transparent)}
+.r1-sc::-webkit-scrollbar{display:none}
+.r1-tr{display:flex;width:max-content;height:100%;align-items:flex-start}
+.r1-pad{flex:none}
+.r1-t{flex:none;width:30px;scroll-snap-align:center;position:relative;height:100%}
+.r1-t:before{content:'';position:absolute;left:50%;top:0;width:2px;height:16px;background:var(--line);transform:translateX(-50%)}
+.r1-t.maj:before{height:28px;background:var(--ink-2)}
+.r1-t span{position:absolute;top:32px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--ink-2);font-weight:600}
+.r1-t i{position:absolute;left:0;right:0;top:0;height:5px}
+.r1-cur{position:absolute;left:50%;top:-4px;transform:translateX(-50%);width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid var(--danger);z-index:2;pointer-events:none}
+.r1-cur:after{content:'';position:absolute;left:-1.5px;top:-2px;width:3px;height:40px;background:var(--danger);border-radius:2px}
+
+/* 2 — carrousel */
+.r2{position:relative;height:74px;margin-top:6px}
+.r2-sc{position:absolute;inset:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;display:flex;align-items:center}
+.r2-sc::-webkit-scrollbar{display:none}
+.r2-it{flex:none;width:64px;text-align:center;scroll-snap-align:center;font-family:var(--head);font-weight:800;font-size:30px;color:var(--ink);transition:none;will-change:transform,opacity}
+.r2-win{position:absolute;left:50%;top:6px;bottom:6px;width:70px;transform:translateX(-50%);border:2px solid var(--ink);border-radius:12px;pointer-events:none;background:rgba(233,194,58,.18)}
+.r2-sub{text-align:center;font-size:11px;color:var(--ink-2);margin-top:2px;min-height:15px}
+
+/* 3 — jauge dégradée */
+.r3-head{display:flex;align-items:baseline;gap:8px;margin-top:4px}
+.r3-v{font-family:var(--head);font-weight:900;font-size:40px;line-height:1}
+.r3-l{font-size:12px;font-weight:600}
+.r3{position:relative;height:56px;margin-top:4px;touch-action:none;user-select:none;-webkit-user-select:none}
+.r3-tr{position:absolute;left:14px;right:14px;top:20px;height:14px;border-radius:7px;background:linear-gradient(90deg,#3DBB6A 0%,#9CC84A 30%,#E8A830 58%,#E07B39 78%,#D64545 100%);box-shadow:inset 0 1px 2px rgba(0,0,0,.15)}
+.r3-tk{position:absolute;top:38px;transform:translateX(-50%);font-size:10px;color:var(--muted)}
+.r3-tk.maj{color:var(--ink-2);font-weight:600;font-size:11px}
+.r3-th{position:absolute;top:10px;width:34px;height:34px;margin-left:-17px;border-radius:50%;background:#fff;border:3px solid var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+</style></head><body>
+<header><h1>Sélecteur RPE · 3 maquettes</h1><p>Démo à essayer au doigt. Rien n'est enregistré : l'app DCAP n'est pas modifiée.</p></header>
+<div class="tabs"><button data-v="1" class="on">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button></div>
+
+<div class="card">
+  <div class="gx-name">Développé couché</div>
+  <div class="gx-obj">2×10 · 50 lbs</div>
+  <div class="gx-prev">Dernière : S42 : 50 lbs 10, 10, 10 à RPE 7/8</div>
+  <div class="sets">
+    <div class="set done"><span class="n">1</span><span class="grp"><span class="bt">−</span><b>50</b><small>lbs</small><span class="bt">+</span></span><span class="grp"><span class="bt">−</span><b>10</b><span class="bt">+</span></span><span class="ok">✓</span></div>
+    <div class="set"><span class="n">2</span><span class="grp"><span class="bt">−</span><b>50</b><small>lbs</small><span class="bt">+</span></span><span class="grp"><span class="bt">−</span><b>9</b><span class="bt">+</span></span><span class="ok">✓</span></div>
+  </div>
+
+  <section class="variant on" data-v="1">
+    <div class="rpe-lab"><span class="mono-label">RPE · faire glisser la règle</span></div>
+    <div class="r1-val" id="r1v">8<small>difficile</small></div>
+    <div class="r1"><div class="r1-cur"></div><div class="r1-sc" id="r1"><div class="r1-tr" id="r1t"></div></div></div>
+  </section>
+
+  <section class="variant" data-v="2">
+    <div class="rpe-lab"><span class="mono-label">RPE · faire défiler</span></div>
+    <div class="r2"><div class="r2-win"></div><div class="r2-sc" id="r2"></div></div>
+    <div class="r2-sub" id="r2s"></div>
+  </section>
+
+  <section class="variant" data-v="3">
+    <div class="rpe-lab"><span class="mono-label">RPE · glisser le curseur</span></div>
+    <div class="r3-head"><span class="r3-v" id="r3v">8</span><span class="r3-l" id="r3l"></span></div>
+    <div class="r3" id="r3"><div class="r3-tr"></div><div class="r3-th" id="r3h"></div></div>
+  </section>
+</div>
+<div class="note" id="note"></div>
+<script>
+(function(){
+  var V=[];for(var x=6;x<=10.001;x+=.5)V.push(Math.round(x*2)/2);
+  var WORD={6:'facile',6.5:'facile +',7:'modéré',7.5:'modéré +',8:'difficile',8.5:'difficile +',9:'très dur',9.5:'quasi max',10:'max'};
+  var RIR={6:'4 reps en réserve',6.5:'3–4 en réserve',7:'3 reps en réserve',7.5:'2–3 en réserve',8:'2 reps en réserve',8.5:'1–2 en réserve',9:'1 rep en réserve',9.5:'0–1 en réserve',10:'aucune en réserve'};
+  function f(v){return String(v).replace('.',',');}
+  function col(v){var t=(v-6)/4;return t<.45?'#3DBB6A':t<.7?'#E8A830':t<.85?'#E07B39':'#D64545';}
+  function buzz(){if(navigator.vibrate)navigator.vibrate(6);}
+  var NOTES={1:'Règle graduée : la règle défile sous un curseur fixe, avec aimantation native sur chaque 0,5 (scroll-snap). Le chiffre en grand et le mot d\'effort se mettent à jour. Traits longs = entiers. Compact (≈110 px), lisible d\'un coup d\'œil.',
+    2:'Carrousel : les nombres défilent, celui du centre grossit dans une fenêtre jaune « muscu » et les voisins s\'estompent. Aimant sur chaque 0,5. Proche du sélecteur iOS horizontal, donc familier. Le plus compact (≈90 px).',
+    3:'Jauge en dégradé vert → or → rouge : on glisse le curseur (ou on tape sur la piste), arrêt sur chaque 0,5. Libellé d\'effort « 8 · 2 reps en réserve ». La couleur aide à voir l\'intensité d\'un coup d\'œil. Seule option sans défilement : précise mais demande un geste plus fin.'};
+  // 1 — règle
+  var r1=document.getElementById('r1'),t1=document.getElementById('r1t'),TW=30;
+  function pad(){return r1.clientWidth/2-TW/2;}
+  t1.innerHTML='<div class="r1-pad" style="flex:none;height:1px"></div>'+V.map(function(v){return '<div class="r1-t'+(v%1?'':' maj')+'">'+(v%1?'':'<span>'+v+'</span>')+'<i style="background:'+col(v)+'"></i></div>';}).join('')+'<div class="r1-pad" style="flex:none;height:1px"></div>';
+  function setPads(){[].forEach.call(t1.querySelectorAll('.r1-pad'),function(p){p.style.width=pad()+'px';p.style.display='block';});}
+  var last1=null;
+  r1.addEventListener('scroll',function(){var i=Math.max(0,Math.min(V.length-1,Math.round(r1.scrollLeft/TW))),v=V[i];if(v!==last1){last1=v;document.getElementById('r1v').innerHTML=f(v)+'<small>'+WORD[v]+'</small>';document.getElementById('r1v').style.color=col(v);buzz();}},{passive:true});
+  // 2 — carrousel
+  var r2=document.getElementById('r2'),IW=64;
+  r2.innerHTML='<div style="flex:none" class="p2"></div>'+V.map(function(v){return '<div class="r2-it" data-v="'+v+'">'+f(v)+'</div>';}).join('')+'<div style="flex:none" class="p2"></div>';
+  var its=[].slice.call(r2.querySelectorAll('.r2-it')),last2=null;
+  function paint2(){var c=r2.scrollLeft+r2.clientWidth/2;its.forEach(function(el){var m=el.offsetLeft+IW/2,d=Math.abs(m-c)/IW;el.style.transform='scale('+Math.max(.55,1.35-d*.38)+')';el.style.opacity=Math.max(.15,1-d*.38);});
+    var i=Math.max(0,Math.min(V.length-1,Math.round(r2.scrollLeft/IW))),v=V[i];if(v!==last2){last2=v;document.getElementById('r2s').textContent=WORD[v]+' · '+RIR[v];buzz();}}
+  r2.addEventListener('scroll',function(){requestAnimationFrame(paint2);},{passive:true});
+  its.forEach(function(el,i){el.onclick=function(){r2.scrollTo({left:i*IW,behavior:'smooth'});};});
+  // 3 — jauge
+  var r3=document.getElementById('r3'),h3=document.getElementById('r3h'),v3=8;
+  V.forEach(function(v){var s=document.createElement('span');s.className='r3-tk'+(v%1?'':' maj');s.textContent=v%1?'·':v;s.dataset.v=v;r3.appendChild(s);});
+  function x3(v){var w=r3.clientWidth-28;return 14+(v-6)/4*w;}
+  function set3(v,b){if(v===v3&&!b)return;v3=v;h3.style.left=x3(v)+'px';h3.style.borderColor=col(v);h3.textContent=f(v);document.getElementById('r3v').textContent=f(v);document.getElementById('r3v').style.color=col(v);document.getElementById('r3l').textContent=RIR[v]+' · '+WORD[v];if(!b)buzz();}
+  function lay3(){[].forEach.call(r3.querySelectorAll('.r3-tk'),function(s){s.style.left=x3(+s.dataset.v)+'px';});set3(v3,true);}
+  function pick(ev){var r=r3.getBoundingClientRect(),t=(ev.clientX-r.left-14)/(r.width-28);set3(V[Math.max(0,Math.min(8,Math.round(t*8)))]);}
+  var dn=false;r3.addEventListener('pointerdown',function(e){dn=true;r3.setPointerCapture(e.pointerId);pick(e);});r3.addEventListener('pointermove',function(e){if(dn)pick(e);});
+  r3.addEventListener('pointerup',function(){dn=false;});r3.addEventListener('pointercancel',function(){dn=false;});
+  // onglets + valeur de départ (8 ou ?rpe=)
+  var q=new URLSearchParams(location.search),start=+(q.get('rpe')||8);
+  function show(v){[].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.classList.toggle('on',b.dataset.v==v);});[].forEach.call(document.querySelectorAll('.variant'),function(s){s.classList.toggle('on',s.dataset.v==v);});document.getElementById('note').textContent=NOTES[v];
+    requestAnimationFrame(function(){setPads();setTimeout(function(){r1.scrollLeft=V.indexOf(start)*TW;},30);[].forEach.call(r2.querySelectorAll('.p2'),function(p){p.style.width=(r2.clientWidth/2-IW/2)+'px';});r2.scrollLeft=V.indexOf(start)*IW;paint2();lay3();});}
+  [].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.onclick=function(){show(b.dataset.v);};});
+  v3=start;show(q.get('v')||'1');window.addEventListener('resize',function(){setPads();lay3();paint2();});
+})();
+</script></body></html>

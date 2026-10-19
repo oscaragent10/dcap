@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com">
+  <link rel="preconnect" href="https://n-4kuui6gfzdzcc7fqotrwpq5fkfjhzpr7xvssfay-0lu-script.googleusercontent.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <meta charset="utf-8">
   <title>DCAP</title>
   <!-- Page d'enveloppe DCAP : page de premier niveau à nous (barre d'état parchemin, icône, plein écran),
@@ -144,7 +148,7 @@
     var VAPID_PUBLIC = 'BE1MgRR6LQIOe6JiooFfUj4A66TPdx80NKHfnQFmZNfHen0Gj2ANEBEXqvqtBI2OT5p1g_KQHCunW72sQrZB4DI';
     var STANDALONE = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
     var PUSH_OK = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
-    var swReg = PUSH_OK ? navigator.serviceWorker.register('sw.js').catch(function () { return null; }) : Promise.resolve(null);
+    var swReg = 'serviceWorker' in navigator ? navigator.serviceWorker.register('sw.js').catch(function () { return null; }) : Promise.resolve(null); // v52 : aussi pour le cache de la coquille
     function pushState() { return PUSH_OK ? Notification.permission : (STANDALONE ? 'unsupported' : 'need-install'); }
     function b64u(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var r = atob(s), a = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) a[i] = r.charCodeAt(i); return a; }
     function sendSub(fresh) {

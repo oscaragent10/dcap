@@ -1,7 +1,28 @@
-/* v50 (dictée Whisper) — DCAP — service worker de l'enveloppe : notifications Web Push du coach (iPhone : app ajoutée à l'écran d'accueil, iOS 16.4+).
-   Pas de cache hors ligne : l'app vit dans Apps Script ; ce worker ne sert qu'aux notifications. */
-self.addEventListener('install', function () { self.skipWaiting(); });
-self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
+/* v52 — DCAP — service worker de l'enveloppe : notifications Web Push du coach + cache de la coquille.
+   Coquille (index.html, manifeste, icônes, worker de dictée) servie depuis le cache tout de suite, puis mise à jour en fond
+   (stale-while-revalidate). Seules les ressources de ce site (même origine, GET) sont mises en cache : jamais l'iframe Apps Script,
+   ni les données, ni les modèles de dictée (déjà gérés par Transformers.js). */
+var SHELL = 'dcap-shell-v52', SHELL_URLS = ['./', './index.html', './manifest.webmanifest', './icons/dcap-192.png', './stt-worker.js'];
+self.addEventListener('install', function (e) {
+  e.waitUntil(caches.open(SHELL).then(function (c) { return c.addAll(SHELL_URLS).catch(function () {}); }).then(function () { return self.skipWaiting(); }));
+});
+self.addEventListener('activate', function (e) {
+  e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k.indexOf('dcap-shell-') === 0 && k !== SHELL; }).map(function (k) { return caches.delete(k); })); })
+    .then(function () { return self.clients.claim(); }));
+});
+self.addEventListener('fetch', function (e) {
+  var r = e.request, u = new URL(r.url);
+  if (r.method !== 'GET' || u.origin !== self.location.origin) return;
+  if (/rpe-demo\.html$/.test(u.pathname)) return; // page de démo : toujours fraîche
+  var key = r.mode === 'navigate' ? './index.html' : r;
+  e.respondWith(caches.open(SHELL).then(function (c) {
+    return c.match(key, { ignoreSearch: true }).then(function (hit) {
+      var net = fetch(r).then(function (res) { if (res && res.ok && res.type === 'basic') c.put(key, res.clone()); return res; });
+      if (hit) { e.waitUntil(net.catch(function () {})); return hit; }
+      return net;
+    });
+  }));
+});
 
 self.addEventListener('push', function (e) {
   var d = {};
