@@ -57,7 +57,7 @@
     function post(m) { if (peer) peer.w.postMessage(Object.assign({ dcap: 1 }, m), peer.o); }
     function env() {
       return { type: 'env', wrapper: true, bottom: document.getElementById('probe').offsetHeight || 0,
-        standalone: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches, speech: !!SR, push: pushState() };
+        standalone: navigator.standalone === true || matchMedia('(display-mode: standalone)').matches, speech: !!(SR || WH.ok), stt: WH.ok ? 'whisper' : (SR ? 'safari' : 'none'), push: pushState() };
     }
     function startRec() {
       if (rec) return;
@@ -74,6 +74,71 @@
         rec.start();
       } catch (err) { rec = null; post({ type: 'speech-error', error: String(err && err.name || err) }); post({ type: 'speech-end' }); }
     }
+
+
+    // ---- Dictée Whisper sur l'appareil (stt-worker.js, Transformers.js v3) ; secours : reconnaissance Safari ci-dessus
+    var WH = (function () {
+      var W = { ok: !!(window.Worker && window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.OfflineAudioContext || window.webkitOfflineAudioContext)),
+        rec: null, worker: null, state: 'idle', loaded: false, failed: false, jobs: {}, seq: 0 };
+      try { if (localStorage.getItem('dcap-stt') === 'safari') W.ok = false; } catch (e) {}
+      function st(state, x) { post(Object.assign({ type: 'speech-state', state: state }, x || {})); }
+      function fallback(why) {
+        W.failed = true; W.ok = false; try { if (W.worker) W.worker.terminate(); } catch (e) {} W.worker = null;
+        Object.keys(W.jobs).forEach(function (k) { W.jobs[k].rej(new Error(why)); }); W.jobs = {};
+        st('fallback', { error: why }); post(env());
+      }
+      function worker() {
+        if (W.worker || !W.ok) return W.worker;
+        try { W.worker = new Worker('stt-worker.js', { type: 'module' }); } catch (e) { fallback('worker: ' + e); return null; }
+        W.worker.onmessage = function (e) {
+          var m = e.data || {};
+          if (m.type === 'progress') st('loading', { loaded: m.loaded, total: m.total });
+          else if (m.type === 'ready') { W.loaded = true; W.device = m.device; st('ready', { device: m.device }); }
+          else if (m.type === 'load-error') fallback('modèle : ' + m.error);
+          else if (m.type === 'result' && W.jobs[m.id]) { W.jobs[m.id].res(m); delete W.jobs[m.id]; }
+          else if (m.type === 'error' && W.jobs[m.id]) { W.jobs[m.id].rej(new Error(m.error)); delete W.jobs[m.id]; }
+        };
+        W.worker.onerror = function (e) { fallback('worker: ' + (e.message || 'erreur')); };
+        return W.worker;
+      }
+      W.preload = function () { var w = worker(); if (w && !W.loaded && !W.preloading) { W.preloading = true; w.postMessage({ type: 'load' }); } };
+      W.start = function () {
+        if (W.rec) return; W.preload();
+        navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }).then(function (stream) {
+          var mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].filter(function (t) { return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t); })[0];
+          var r = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined), parts = [], t0 = Date.now();
+          W.rec = r;
+          r.ondataavailable = function (e) { if (e.data && e.data.size) parts.push(e.data); };
+          r.onstop = function () {
+            clearInterval(W.tick); stream.getTracks().forEach(function (t) { t.stop(); }); W.rec = null;
+            var blob = new Blob(parts, { type: r.mimeType || mime || 'audio/mp4' });
+            if (Date.now() - t0 < 500 || !blob.size) { post({ type: 'speech-end' }); return; }
+            st('transcribing');
+            blob.arrayBuffer().then(decode16k).then(function (pcm) {
+              var w = worker(); if (!w) throw new Error('whisper indisponible');
+              var id = ++W.seq;
+              return new Promise(function (res, rej) { W.jobs[id] = { res: res, rej: rej }; w.postMessage({ type: 'transcribe', id: id, audio: pcm }, [pcm.buffer]); });
+            }).then(function (m) {
+              post({ type: 'speech', text: m.text, interim: false, ms: m.ms, device: m.device }); post({ type: 'speech-end' });
+            }).catch(function (err) { post({ type: 'speech-error', error: 'whisper: ' + (err && err.message || err) }); post({ type: 'speech-end' }); });
+          };
+          r.start(1000); post({ type: 'speech-start' }); st('rec', { s: 0 });
+          W.tick = setInterval(function () { var s = Math.round((Date.now() - t0) / 1000); st('rec', { s: s }); if (s >= 120) r.stop(); }, 500);
+        }).catch(function (err) { post({ type: 'speech-error', error: err && err.name === 'NotAllowedError' ? 'not-allowed' : String(err && err.name || err) }); post({ type: 'speech-end' }); });
+      };
+      W.stop = function () { if (W.rec && W.rec.state !== 'inactive') W.rec.stop(); };
+      // Décodage (mp4/AAC sur iOS, webm ailleurs) + rééchantillonnage 16 kHz mono via OfflineAudioContext
+      function decode16k(buf) {
+        var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, ctx = new OAC(1, 16000, 16000);
+        return new Promise(function (res, rej) { var p = ctx.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); }).then(function (ab) {
+          if (ab.sampleRate === 16000 && ab.numberOfChannels === 1) return new Float32Array(ab.getChannelData(0));
+          var n = Math.ceil(ab.duration * 16000), off = new OAC(1, n, 16000), src = off.createBufferSource();
+          src.buffer = ab; src.connect(off.destination); src.start(0);
+          return off.startRendering().then(function (r) { return new Float32Array(r.getChannelData(0)); });
+        });
+      }
+      return W;
+    })();
 
     // ---- Notifications Web Push (iOS 16.4+ : uniquement dans l'app ajoutée à l'écran d'accueil)
     var VAPID_PUBLIC = 'BE1MgRR6LQIOe6JiooFfUj4A66TPdx80NKHfnQFmZNfHen0Gj2ANEBEXqvqtBI2OT5p1g_KQHCunW72sQrZB4DI';
@@ -116,8 +181,9 @@
       }
       else if (m.type === 'notif-ui') showSheet();
       else if (m.type === 'badge' && navigator.setAppBadge) { (m.n ? navigator.setAppBadge(m.n) : navigator.clearAppBadge()).catch(function () {}); }
-      else if (m.type === 'mic-start' && SR) startRec();
-      else if (m.type === 'mic-stop' && rec) rec.stop();
+      else if (m.type === 'mic-preload') WH.preload();
+      else if (m.type === 'mic-start') { if (WH.ok) WH.start(); else if (SR) startRec(); }
+      else if (m.type === 'mic-stop') { if (WH.rec) WH.stop(); else if (rec) rec.stop(); }
     });
     window.addEventListener('resize', function () { post(env()); });
 

@@ -1,4 +1,4 @@
-/* DCAP — service worker de l'enveloppe : notifications Web Push du coach (iPhone : app ajoutée à l'écran d'accueil, iOS 16.4+).
+/* v50 (dictée Whisper) — DCAP — service worker de l'enveloppe : notifications Web Push du coach (iPhone : app ajoutée à l'écran d'accueil, iOS 16.4+).
    Pas de cache hors ligne : l'app vit dans Apps Script ; ce worker ne sert qu'aux notifications. */
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
