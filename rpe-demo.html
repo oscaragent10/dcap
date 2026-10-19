@@ -10,8 +10,8 @@
 html,body{margin:0;background:var(--parchment);color:var(--ink);font-family:var(--mono);overscroll-behavior:none}
 header{padding:14px 14px 4px;font-family:var(--head)} header h1{margin:0;font-size:24px;font-weight:900;letter-spacing:.03em}
 header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted)}
-.tabs{display:flex;gap:6px;padding:8px 14px}
-.tabs button{flex:1;font:600 12px var(--mono);padding:8px 4px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px}
+.tabs button{flex:1 1 28%;font:600 12px var(--mono);padding:8px 4px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
 .tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .card{background:#fff;border:1px solid var(--line);border-radius:6px;margin:10px 14px;padding:10px 10px 12px}
 .gx-name{font-family:var(--head);font-weight:700;font-size:20px;line-height:1.1}
@@ -78,9 +78,40 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
 .rw-c b{font-family:var(--head);font-weight:800;font-size:19px;line-height:1}
 .rw-ind{position:absolute;left:50%;top:-3px;bottom:-3px;width:26px;margin-left:-13px;border:2px solid var(--ink);border-radius:8px;pointer-events:none;background:rgba(233,194,58,.18)}
 .rw-lab{font-size:10.5px;color:var(--ink-2);text-align:center;margin-top:4px;min-height:14px}
+
+/* Claude — molette RPE (fichier d'origine, couleurs/police DCAP comme dans l'app v54) */
+.rpe-wheel{
+  /* Couleurs : fond transparent, la molette prend le fond de la page */
+  --rw-ink:#2a2620; --rw-tick:#c9c2b2; --rw-ridge:rgba(42,38,32,.10);
+  --rw-shade:rgba(42,38,32,.07); --rw-frame-fill:#f6edd6; --rw-font:inherit;
+  position:relative; width:100%; height:64px; outline:none; cursor:grab; touch-action:pan-y;
+  user-select:none; -webkit-user-select:none; background:transparent;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 82%,transparent 100%);
+          mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 82%,transparent 100%)}
+.rpe-wheel.rw-grab{cursor:grabbing}
+.rpe-wheel .rw-body{position:absolute; inset:0; border-radius:12px; pointer-events:none;
+  background:linear-gradient(180deg,var(--rw-shade) 0%,transparent 25%,transparent 75%,var(--rw-shade) 100%)}
+.rpe-wheel .rw-stage{position:absolute; inset:0; perspective:620px; overflow:hidden; border-radius:12px}
+.rpe-wheel .rw-ring{position:absolute; left:50%; top:50%; width:0; height:0; transform-style:preserve-3d}
+.rpe-wheel .rw-it{position:absolute; left:-20px; top:-20px; width:40px; height:40px; display:grid; place-items:center;
+  backface-visibility:hidden; will-change:transform,opacity; color:var(--rw-ink)}
+.rpe-wheel .rw-it b{font-family:var(--rw-font); font-weight:800; font-size:20px; line-height:1; font-variant-numeric:tabular-nums}
+.rpe-wheel .rw-it i{display:block; width:2px; height:11px; border-radius:2px; background:var(--rw-tick)}
+.rpe-wheel .rw-it.rw-on i{background:var(--rw-ink); height:15px}
+.rpe-wheel .rw-rg{position:absolute; left:-.75px; top:-29px; width:1.5px; height:58px; backface-visibility:hidden;
+  background:linear-gradient(180deg,var(--rw-ridge) 0 6px,transparent 6px calc(100% - 6px),var(--rw-ridge) calc(100% - 6px))}
+.rpe-wheel .rw-light{position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(90deg,var(--rw-shade) 0%,transparent 32%,transparent 68%,var(--rw-shade) 100%)}
+.rpe-wheel .rw-fill,.rpe-wheel .rw-frame{position:absolute; left:50%; top:50%; width:42px; height:48px;
+  margin:-24px 0 0 -21px; border-radius:10px; pointer-events:none}
+.rpe-wheel .rw-fill{background:var(--rw-frame-fill)}
+.rpe-wheel .rw-frame{border:2.5px solid var(--rw-ink)}
+.rpe-wheel:focus-visible .rw-frame{outline:2px solid var(--rw-tick); outline-offset:3px}
+
+.rpe-wheel{--rw-ink:var(--ink);--rw-tick:#B9B09C;--rw-ridge:rgba(31,36,34,.10);--rw-shade:rgba(31,36,34,.07);--rw-frame-fill:rgba(233,194,58,.22);--rw-font:var(--head)}
 </style></head><body>
 <header><h1>Sélecteur RPE · 3 maquettes</h1><p>Démo à essayer au doigt. Rien n'est enregistré : l'app DCAP n'est pas modifiée.</p></header>
-<div class="tabs"><button data-v="1" class="on">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button><button data-v="4">2 bis · Roue ✓</button></div>
+<div class="tabs"><button data-v="1" class="on">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button><button data-v="4">2 bis · Roue</button><button data-v="5">Claude ✓</button></div>
 
 <div class="card">
   <div class="gx-name">Développé couché</div>
@@ -108,6 +139,11 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
     <div class="rw-lab" id="r4l"></div>
   </section>
 
+  <section class="variant" data-v="5">
+    <div class="rpe-wheel" id="r5" data-value="8" data-min="6" data-max="10" data-step="0.5" style="margin-top:12px"></div>
+    <div class="rw-lab" id="r5l">RPE · faire tourner la molette</div>
+  </section>
+
   <section class="variant" data-v="3">
     <div class="rpe-lab"><span class="mono-label">RPE · glisser le curseur</span></div>
     <div class="r3-head"><span class="r3-v" id="r3v">8</span><span class="r3-l" id="r3l"></span></div>
@@ -126,6 +162,7 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
   var NOTES={1:'Règle graduée : la règle défile sous un curseur fixe, avec aimantation native sur chaque 0,5 (scroll-snap). Le chiffre en grand et le mot d\'effort se mettent à jour. Traits longs = entiers. Compact (≈110 px), lisible d\'un coup d\'œil.',
     2:'Carrousel : les nombres défilent, celui du centre grossit dans une fenêtre jaune « muscu » et les voisins s\'estompent. Aimant sur chaque 0,5. Proche du sélecteur iOS horizontal, donc familier. Le plus compact (≈90 px).',
     4:'Roue crantée (version retenue, déployée dans DCAP) : environ 56 px de haut. Chiffres sur les entiers, simple trait sur chaque demi-point (sélectionnable, aimant sur 0,5). Les crans se resserrent et s\'estompent vers les bords. La valeur exacte (,5 compris) s\'affiche sous la roue avec le mot d\'effort et les reps en réserve.',
+    5:'Molette de Claude (version testée dans DCAP v54) : vraie roue 3D en perspective, stries, inertie au lâcher, tap sur un cran. Plage 6–10, couleurs et police DCAP.',
     3:'Jauge en dégradé vert → or → rouge : on glisse le curseur (ou on tape sur la piste), arrêt sur chaque 0,5. Libellé d\'effort « 8 · 2 reps en réserve ». La couleur aide à voir l\'intensité d\'un coup d\'œil. Seule option sans défilement : précise mais demande un geste plus fin.'};
   // 1 — règle
   var r1=document.getElementById('r1'),t1=document.getElementById('r1t'),TW=30;
@@ -164,6 +201,125 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
   function show(v){[].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.classList.toggle('on',b.dataset.v==v);});[].forEach.call(document.querySelectorAll('.variant'),function(s){s.classList.toggle('on',s.dataset.v==v);});document.getElementById('note').textContent=NOTES[v];
     requestAnimationFrame(function(){setPads();setTimeout(function(){r1.scrollLeft=V.indexOf(start)*TW;},30);[].forEach.call(r2.querySelectorAll('.p2'),function(p){p.style.width=(r2.clientWidth/2-IW/2)+'px';});r2.scrollLeft=V.indexOf(start)*IW;paint2();lay3();[].forEach.call(t4.querySelectorAll('.p4'),function(p){p.style.width=(r4.clientWidth/2-W4/2)+'px';});setTimeout(function(){r4.scrollLeft=V.indexOf(start)*W4;paint4();},30);});}
   [].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.onclick=function(){show(b.dataset.v);};});
-  v3=start;show(q.get('v')||'4');window.addEventListener('resize',function(){setPads();lay3();paint2();});
+  v3=start;show(q.get('v')||'5');window.addEventListener('resize',function(){setPads();lay3();paint2();});
 })();
-</script></body></html>
+</script><script>
+/* Lecture : el.value  ·  écoute : el.addEventListener('change', e => e.detail.value)  ·  écriture : el.setValue(8.5) */
+(function(){
+  const DTH=17, RIDGE_STEP=4, rad=d=>d*Math.PI/180;
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function init(wheel){
+    if(wheel._rw) return; wheel._rw=true;
+    const MIN=+wheel.dataset.min||1, MAX=+wheel.dataset.max||10, STEP=+wheel.dataset.step||0.5;
+    const N=Math.round((MAX-MIN)/STEP)+1;
+    wheel.tabIndex=0; wheel.setAttribute('role','slider');
+    wheel.setAttribute('aria-valuemin',MIN); wheel.setAttribute('aria-valuemax',MAX);
+    wheel.innerHTML='<div class="rw-body"></div><div class="rw-fill"></div><div class="rw-stage"><div class="rw-ring"></div></div><div class="rw-light"></div><div class="rw-frame"></div>';
+    const ring=wheel.querySelector('.rw-ring'), items=[], ridges=[];
+    for(let i=0;i<N;i++){
+      const v=MIN+i*STEP, el=document.createElement('div');
+      el.className='rw-it'; el.dataset.i=i;
+      el.innerHTML=Number.isInteger(v)?'<b>'+v+'</b>':'<i></i>';
+      ring.appendChild(el); items.push(el);
+    }
+    for(let k=0;k<360/RIDGE_STEP;k++){const r=document.createElement('div'); r.className='rw-rg'; ring.appendChild(r); ridges.push(r);}
+
+    const clampI=i=>Math.max(0,Math.min(N-1,i));
+    let R=160, unit=48, p=clampI(Math.round(((+wheel.dataset.value||MIN)-MIN)/STEP)), cur=-1, target=p, anim=0, dragging=false;
+
+    function measure(){
+      R=Math.max(110, wheel.clientWidth*0.40); unit=R*rad(DTH);
+      ring.style.transform='translateZ('+(-R)+'px)'; render(true);
+    }
+    function render(silent){
+      for(let i=0;i<N;i++){
+        const th=(i-p)*DTH, el=items[i];
+        if(Math.abs(th)>=90){el.style.visibility='hidden'; continue;}
+        const c=Math.cos(rad(th));
+        el.style.visibility='visible';
+        el.style.transform='rotateY('+th+'deg) translateZ('+R+'px)';
+        el.style.opacity=(0.15+0.85*c*c).toFixed(3);
+      }
+      const off=p*DTH;
+      for(let k=0;k<ridges.length;k++){
+        const th=((k*RIDGE_STEP-off)%360+540)%360-180, r=ridges[k];
+        if(Math.abs(th)>=88){r.style.visibility='hidden'; continue;}
+        r.style.visibility='visible';
+        r.style.transform='rotateY('+th+'deg) translateZ('+R+'px)';
+      }
+      const idx=clampI(Math.round(p));
+      if(idx!==cur){
+        if(cur>=0) items[cur].classList.remove('rw-on');
+        items[idx].classList.add('rw-on'); cur=idx;
+        const v=MIN+idx*STEP;
+        wheel.value=v; wheel.dataset.value=v;
+        wheel.setAttribute('aria-valuenow',v); wheel.setAttribute('aria-valuetext',String(v).replace('.',','));
+        if(!silent){
+          wheel.dispatchEvent(new CustomEvent('change',{detail:{value:v},bubbles:true}));
+          if(dragging&&navigator.vibrate) try{navigator.vibrate(3)}catch(e){}
+        }
+      }
+    }
+    function animateTo(t){
+      target=clampI(t); cancelAnimationFrame(anim);
+      const from=p, d=target-from;
+      if(reduce||Math.abs(d)<1e-3){p=target; render(); return;}
+      const dur=Math.min(900,Math.max(240,220+Math.abs(d)*55)), t0=performance.now();
+      const step=now=>{const k=Math.min(1,(now-t0)/dur); p=from+d*(1-Math.pow(1-k,3)); render(); if(k<1) anim=requestAnimationFrame(step);};
+      anim=requestAnimationFrame(step);
+    }
+    wheel.setValue=v=>animateTo(Math.round((v-MIN)/STEP));
+
+    let x0=0,p0=0,moved=0,samples=[];
+    wheel.addEventListener('pointerdown',e=>{
+      cancelAnimationFrame(anim); dragging=true; moved=0; x0=e.clientX; p0=p;
+      samples=[{t:e.timeStamp,x:e.clientX}]; wheel.classList.add('rw-grab'); wheel.setPointerCapture(e.pointerId);
+    });
+    wheel.addEventListener('pointermove',e=>{
+      if(!dragging) return;
+      const dx=e.clientX-x0; moved=Math.max(moved,Math.abs(dx));
+      let np=p0-dx/unit;
+      if(np<0) np*=0.3; else if(np>N-1) np=N-1+(np-(N-1))*0.3;
+      p=np; render();
+      samples.push({t:e.timeStamp,x:e.clientX}); if(samples.length>6) samples.shift();
+    });
+    function release(e){
+      if(!dragging) return; dragging=false; wheel.classList.remove('rw-grab');
+      if(moved<5){
+        const hit=document.elementsFromPoint(e.clientX,e.clientY).find(n=>n.classList&&n.classList.contains('rw-it')&&wheel.contains(n));
+        animateTo(hit?+hit.dataset.i:Math.round(p)); return;
+      }
+      const a=samples[0], b=samples[samples.length-1], dt=Math.max(1,b.t-a.t);
+      animateTo(Math.round(p-(b.x-a.x)/dt/unit*260));
+    }
+    wheel.addEventListener('pointerup',release);
+    wheel.addEventListener('pointercancel',release);
+
+    let acc=0;
+    wheel.addEventListener('wheel',e=>{
+      e.preventDefault();
+      acc+=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
+      let n=0; while(Math.abs(acc)>=28){n+=Math.sign(acc); acc-=Math.sign(acc)*28;}
+      if(n) animateTo(target+n);
+    },{passive:false});
+
+    wheel.addEventListener('keydown',e=>{
+      const m={ArrowRight:1,ArrowUp:1,ArrowLeft:-1,ArrowDown:-1,PageUp:2,PageDown:-2};
+      if(e.key in m){e.preventDefault(); animateTo(target+m[e.key]);}
+      else if(e.key==='Home'){e.preventDefault(); animateTo(0);}
+      else if(e.key==='End'){e.preventDefault(); animateTo(N-1);}
+    });
+
+    if(window.ResizeObserver) new ResizeObserver(measure).observe(wheel); else window.addEventListener('resize',measure);
+    measure();
+  }
+
+  const boot=()=>document.querySelectorAll('.rpe-wheel').forEach(init);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+  window.initRpeWheels=boot;   // à rappeler si tu ajoutes des molettes dynamiquement
+})();
+</script>
+<script>(function(){var w=document.getElementById('r5'),l=document.getElementById('r5l');var W={6:'facile',6.5:'facile +',7:'modéré',7.5:'modéré +',8:'difficile',8.5:'difficile +',9:'très dur',9.5:'quasi max',10:'max'},R={6:'4 reps en réserve',6.5:'3–4 en réserve',7:'3 reps en réserve',7.5:'2–3 en réserve',8:'2 reps en réserve',8.5:'1–2 en réserve',9:'1 rep en réserve',9.5:'0–1 en réserve',10:'aucune en réserve'};
+w.addEventListener('change',function(e){var v=e.detail.value;l.innerHTML='<b>RPE '+String(v).replace('.',',')+'</b> · '+W[v]+' · '+R[v];});})();</script>
+</body></html>
