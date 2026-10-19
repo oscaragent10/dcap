@@ -89,7 +89,13 @@
     var WH = (function () {
       var W = { ok: !!(window.Worker && window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.OfflineAudioContext || window.webkitOfflineAudioContext)),
         rec: null, worker: null, state: 'idle', loaded: false, failed: false, jobs: {}, seq: 0 };
-      try { if (localStorage.getItem('dcap-stt') === 'safari') W.ok = false; } catch (e) {}
+      // v60 : dictée Safari par défaut (rapide, texte en direct). Whisper seulement sur demande explicite : ?stt=whisper (mémorisé), ?stt=safari pour revenir.
+      var want = null; try { want = new URLSearchParams(location.search).get('stt'); if (want) localStorage.setItem('dcap-stt', want); else want = localStorage.getItem('dcap-stt'); } catch (e) {}
+      if (want !== 'whisper') {
+        W.ok = false;
+        // libère le modèle Whisper déjà téléchargé (~250 Mo, cache Transformers.js) ; aucun autre cache ni brouillon touché
+        try { if (window.caches) caches.delete('transformers-cache'); } catch (e) {}
+      }
       function st(state, x) { post(Object.assign({ type: 'speech-state', state: state }, x || {})); }
       function fallback(why) {
         W.failed = true; W.ok = false; try { if (W.worker) W.worker.terminate(); } catch (e) {} W.worker = null;

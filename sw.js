@@ -2,7 +2,7 @@
    Coquille (index.html, manifeste, icônes, worker de dictée) servie depuis le cache tout de suite, puis mise à jour en fond
    (stale-while-revalidate). Seules les ressources de ce site (même origine, GET) sont mises en cache : jamais l'iframe Apps Script,
    ni les données, ni les modèles de dictée (déjà gérés par Transformers.js). */
-var SHELL = 'dcap-shell-v58', SHELL_URLS = ['./', './index.html', './manifest.webmanifest', './icons/dcap-192.png', './stt-worker.js'];
+var SHELL = 'dcap-shell-v60', SHELL_URLS = ['./', './index.html', './manifest.webmanifest', './icons/dcap-192.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(SHELL).then(function (c) { return c.addAll(SHELL_URLS).catch(function () {}); }).then(function () { return self.skipWaiting(); }));
 });
