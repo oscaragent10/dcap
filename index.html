@@ -42,7 +42,12 @@
 <body>
   <div id="top" aria-hidden="true"></div>
   <div id="probe"></div>
-  <iframe id="app" title="DCAP" src="https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec" allow="clipboard-write; fullscreen"></iframe>
+  <iframe id="app" title="DCAP" allow="clipboard-write; fullscreen"></iframe>
+  <script>
+    // v58 : chargement de l'app avec un paramètre unique → jamais une page /exec gardée en cache par iOS (chaque lancement = dernier déploiement).
+    var DCAP_EXEC = 'https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec';
+    document.getElementById('app').src = DCAP_EXEC + '?t=' + Date.now();
+  </script>
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <div id="fallback">Le tableau de bord ne s'affiche pas ici.<br><a href="https://script.google.com/macros/s/AKfycbyunieVSGlSiZE0ZwaN_oAKHC9ZP7cRzIcttweKO-_ulkpsDzItiS67UT0ziRDr6otL/exec" target="_blank" rel="noopener">Ouvrir DCAP directement</a></div>
@@ -182,6 +187,10 @@
         post(env());
         if (wantCoach) { wantCoach = false; post({ type: 'open-coach' }); }
         if (PUSH_OK && Notification.permission === 'granted') sendSub(false).catch(function () {}); // rafraîchit l'abonnement dans le Sheet
+      }
+      else if (m.type === 'reload') { // v58 : l'app a vu un déploiement plus récent → recharge du cadre (anti-boucle côté app)
+        var fr = document.getElementById('app'); peer = null; fr.src = DCAP_EXEC + '?b=' + encodeURIComponent(m.build || '') + '&t=' + Date.now();
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'refresh-shell' });
       }
       else if (m.type === 'notif-ui') showSheet();
       else if (m.type === 'badge' && navigator.setAppBadge) { (m.n ? navigator.setAppBadge(m.n) : navigator.clearAppBadge()).catch(function () {}); }
