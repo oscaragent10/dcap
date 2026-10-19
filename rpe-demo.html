@@ -156,10 +156,16 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
 .rpe-wheel.v2.rw-bare{border:0;border-radius:0;background:none;
   -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 22%,#000 78%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0,#000 22%,#000 78%,transparent 100%)}
 .rpe-wheel.v2.rw-bare .rw-light,.rpe-wheel.v2.rw-bare .rw-body{display:none}
+
+/* v59 : cadre à la largeur de la roue (rw-fit) — boîtier v55/v56 centré, la zone tactile garde toute la largeur ; R = demi-largeur du cadre → la roue s'arrête net sur ses bords */
+.rpe-wheel.v2.rw-fit{--rw-w:min(200px,64%);border:0;border-radius:0;background:none;overflow:visible;-webkit-mask-image:none;mask-image:none}
+.rpe-wheel.v2.rw-fit .rw-stage,.rpe-wheel.v2.rw-fit .rw-body,.rpe-wheel.v2.rw-fit .rw-light,.rpe-wheel.v2.rw-fit .rw-mk{left:50%;right:auto;width:var(--rw-w);margin-left:calc(var(--rw-w) / -2)}
+.rpe-wheel.v2.rw-fit .rw-stage,.rpe-wheel.v2.rw-fit .rw-body,.rpe-wheel.v2.rw-fit .rw-light{border-radius:8px}
+.rpe-wheel.v2.rw-fit .rw-stage{box-sizing:border-box;border:1px solid var(--rw-edge);background:var(--rw-bg)}
 .rpe-wheel.v2.rw-bare.rw-unset .rw-on b{color:var(--rw-dim)}
 </style></head><body>
 <header><h1>Sélecteur RPE · 3 maquettes</h1><p>Démo à essayer au doigt. Rien n'est enregistré : l'app DCAP n'est pas modifiée.</p></header>
-<div class="tabs"><button data-v="1" class="on">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button><button data-v="4">2 bis · Roue</button><button data-v="5">Claude v1</button><button data-v="9">v2 · noir sans cadre ✓</button><button data-v="6">Claude v2 · A</button><button data-v="7">Claude v2 · B</button><button data-v="8">Claude v2 · C</button></div>
+<div class="tabs"><button data-v="1">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button><button data-v="4">2 bis · Roue</button><button data-v="5">Claude v1</button><button data-v="10" class="on">v2 · cadre roue ✓</button><button data-v="9">v2 · noir sans cadre</button><button data-v="6">Claude v2 · A</button><button data-v="7">Claude v2 · B</button><button data-v="8">Claude v2 · C</button></div>
 
 <div class="card">
   <div class="gx-name">Développé couché</div>
@@ -192,6 +198,10 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
     <div class="rw-lab" id="r5l">RPE · faire tourner la molette</div>
   </section>
 
+  <section class="variant" data-v="10">
+    <div class="rpe-wheel v2 mk-a sel-ink rw-fit" data-value="START" data-min="6" data-max="10" data-step="0.5"></div>
+    <div class="rw-lab">RPE · faire tourner la molette</div>
+  </section>
   <section class="variant" data-v="9">
     <div class="rpe-wheel v2 mk-a sel-ink rw-bare" data-value="START" data-min="6" data-max="10" data-step="0.5"></div>
     <div class="rw-lab">RPE · faire tourner la molette</div>
@@ -227,7 +237,8 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
     2:'Carrousel : les nombres défilent, celui du centre grossit dans une fenêtre jaune « muscu » et les voisins s\'estompent. Aimant sur chaque 0,5. Proche du sélecteur iOS horizontal, donc familier. Le plus compact (≈90 px).',
     4:'Roue crantée (version retenue, déployée dans DCAP) : environ 56 px de haut. Chiffres sur les entiers, simple trait sur chaque demi-point (sélectionnable, aimant sur 0,5). Les crans se resserrent et s\'estompent vers les bords. La valeur exacte (,5 compris) s\'affiche sous la roue avec le mot d\'effort et les reps en réserve.',
     5:'Molette de Claude (version testée dans DCAP v54) : vraie roue 3D en perspective, stries, inertie au lâcher, tap sur un cran. Plage 6–10, couleurs et police DCAP.',
-    9:'v2 · noir sans cadre (déployée dans DCAP v57) : repère A, mais le chiffre sélectionné, le trait central sur un ,5 et les deux fines lignes sont en encre noire. Pas de boîtier : ni bordure, ni ombre, ni fond. Seule la roue reste, avec un fondu vers les bords.',
+    10:'v2 · cadre roue (déployée dans DCAP v59) : le boîtier revient (bordure, léger fond, ombre interne) mais seulement à la largeur de la roue, centré ; la roue s’arrête net sur ses bords. Zone tactile pleine largeur.',
+    9:'v2 · noir sans cadre (DCAP v57) : repère A, mais le chiffre sélectionné, le trait central sur un ,5 et les deux fines lignes sont en encre noire. Pas de boîtier : ni bordure, ni ombre, ni fond. Seule la roue reste, avec un fondu vers les bords.',
     6:'Claude v2 · A (DCAP v55–v56) : pas de boîte. Le chiffre central est plus gros et vert, les autres gris, et deux fines lignes verticales fixes encadrent le centre, comme un sélecteur iOS. Sur un ,5, le trait central devient vert et plus long. Hauteur = 75 % d\'une ligne de série.',
     7:'Claude v2 · B : chiffre central en encre pleine et plus gros, petites encoches triangulaires fixes en haut et en bas. Sur un ,5, le trait central passe en encre et s\'allonge.',
     8:'Claude v2 · C : chiffre central vert, petite encoche verte en haut et fin trait vert sous le chiffre. Sur un ,5, le trait central devient vert.',
@@ -269,7 +280,7 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
   function show(v){[].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.classList.toggle('on',b.dataset.v==v);});[].forEach.call(document.querySelectorAll('.variant'),function(s){s.classList.toggle('on',s.dataset.v==v);});document.getElementById('note').textContent=NOTES[v];
     requestAnimationFrame(function(){setPads();setTimeout(function(){r1.scrollLeft=V.indexOf(start)*TW;},30);[].forEach.call(r2.querySelectorAll('.p2'),function(p){p.style.width=(r2.clientWidth/2-IW/2)+'px';});r2.scrollLeft=V.indexOf(start)*IW;paint2();lay3();[].forEach.call(t4.querySelectorAll('.p4'),function(p){p.style.width=(r4.clientWidth/2-W4/2)+'px';});setTimeout(function(){r4.scrollLeft=V.indexOf(start)*W4;paint4();},30);});}
   [].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.onclick=function(){show(b.dataset.v);};});
-  v3=start;show(q.get('v')||'9');window.addEventListener('resize',function(){setPads();lay3();paint2();});
+  v3=start;show(q.get('v')||'10');window.addEventListener('resize',function(){setPads();lay3();paint2();});
 })();
 </script><script>
 /* Lecture : el.value  ·  écoute : el.addEventListener('change', e => e.detail.value)  ·  écriture : el.setValue(8.5) */
@@ -415,7 +426,7 @@ w.addEventListener('change',function(e){var v=e.detail.value;l.innerHTML='<b>RPE
       function show(el, on) { if (el._v !== on) { el.style.visibility = on ? 'visible' : 'hidden'; el._v = on; } }
       function measure() {
         if (!wheel.isConnected || !wheel.clientWidth) return;
-        R = Math.max(100, wheel.clientWidth / 2); unit = R * rad(DTH);
+        R = wheel.classList.contains('rw-fit') ? Math.max(60, stage.clientWidth / 2) : Math.max(100, wheel.clientWidth / 2); unit = R * rad(DTH); // v59 : en rw-fit, R = demi-largeur du cadre
         stage.style.perspective = Math.round(R * 3.2) + 'px'; ring.style.transform = 'translateZ(' + (-R) + 'px)';
         render(true);
       }
