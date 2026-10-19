@@ -64,9 +64,23 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
 .r3-tk{position:absolute;top:38px;transform:translateX(-50%);font-size:10px;color:var(--muted)}
 .r3-tk.maj{color:var(--ink-2);font-weight:600;font-size:11px}
 .r3-th{position:absolute;top:10px;width:34px;height:34px;margin-left:-17px;border-radius:50%;background:#fff;border:3px solid var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+
+/* 2 bis — roue crantée (version retenue, déployée dans DCAP v53) */
+.rw{position:relative;height:38px;margin-top:14px}
+.rw-sc{position:absolute;inset:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain;
+  background:linear-gradient(180deg,#F3EEE4,#FBF8F2 45%,#F3EEE4);border:1px solid var(--line-2);border-radius:19px;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);mask-image:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent)}
+.rw-sc::-webkit-scrollbar{display:none}
+.rw-tr{display:flex;width:max-content;height:100%;align-items:center}
+.rw-c{flex:none;width:22px;height:100%;scroll-snap-align:center;position:relative;display:flex;align-items:center;justify-content:center}
+.rw-c:before{content:'';position:absolute;left:50%;top:50%;width:2px;height:12px;margin:-6px 0 0 -1px;border-radius:1px;background:var(--muted)}
+.rw-c.maj:before{display:none}
+.rw-c b{font-family:var(--head);font-weight:800;font-size:19px;line-height:1}
+.rw-ind{position:absolute;left:50%;top:-3px;bottom:-3px;width:26px;margin-left:-13px;border:2px solid var(--ink);border-radius:8px;pointer-events:none;background:rgba(233,194,58,.18)}
+.rw-lab{font-size:10.5px;color:var(--ink-2);text-align:center;margin-top:4px;min-height:14px}
 </style></head><body>
 <header><h1>Sélecteur RPE · 3 maquettes</h1><p>Démo à essayer au doigt. Rien n'est enregistré : l'app DCAP n'est pas modifiée.</p></header>
-<div class="tabs"><button data-v="1" class="on">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button></div>
+<div class="tabs"><button data-v="1" class="on">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button><button data-v="4">2 bis · Roue ✓</button></div>
 
 <div class="card">
   <div class="gx-name">Développé couché</div>
@@ -89,6 +103,11 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
     <div class="r2-sub" id="r2s"></div>
   </section>
 
+  <section class="variant" data-v="4">
+    <div class="rw"><div class="rw-sc" id="r4"><div class="rw-tr" id="r4t"></div></div><i class="rw-ind"></i></div>
+    <div class="rw-lab" id="r4l"></div>
+  </section>
+
   <section class="variant" data-v="3">
     <div class="rpe-lab"><span class="mono-label">RPE · glisser le curseur</span></div>
     <div class="r3-head"><span class="r3-v" id="r3v">8</span><span class="r3-l" id="r3l"></span></div>
@@ -106,6 +125,7 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
   function buzz(){if(navigator.vibrate)navigator.vibrate(6);}
   var NOTES={1:'Règle graduée : la règle défile sous un curseur fixe, avec aimantation native sur chaque 0,5 (scroll-snap). Le chiffre en grand et le mot d\'effort se mettent à jour. Traits longs = entiers. Compact (≈110 px), lisible d\'un coup d\'œil.',
     2:'Carrousel : les nombres défilent, celui du centre grossit dans une fenêtre jaune « muscu » et les voisins s\'estompent. Aimant sur chaque 0,5. Proche du sélecteur iOS horizontal, donc familier. Le plus compact (≈90 px).',
+    4:'Roue crantée (version retenue, déployée dans DCAP) : environ 56 px de haut. Chiffres sur les entiers, simple trait sur chaque demi-point (sélectionnable, aimant sur 0,5). Les crans se resserrent et s\'estompent vers les bords. La valeur exacte (,5 compris) s\'affiche sous la roue avec le mot d\'effort et les reps en réserve.',
     3:'Jauge en dégradé vert → or → rouge : on glisse le curseur (ou on tape sur la piste), arrêt sur chaque 0,5. Libellé d\'effort « 8 · 2 reps en réserve ». La couleur aide à voir l\'intensité d\'un coup d\'œil. Seule option sans défilement : précise mais demande un geste plus fin.'};
   // 1 — règle
   var r1=document.getElementById('r1'),t1=document.getElementById('r1t'),TW=30;
@@ -131,11 +151,19 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
   function pick(ev){var r=r3.getBoundingClientRect(),t=(ev.clientX-r.left-14)/(r.width-28);set3(V[Math.max(0,Math.min(8,Math.round(t*8)))]);}
   var dn=false;r3.addEventListener('pointerdown',function(e){dn=true;r3.setPointerCapture(e.pointerId);pick(e);});r3.addEventListener('pointermove',function(e){if(dn)pick(e);});
   r3.addEventListener('pointerup',function(){dn=false;});r3.addEventListener('pointercancel',function(){dn=false;});
+  // 4 — roue crantée
+  var r4=document.getElementById('r4'),t4=document.getElementById('r4t'),W4=22,l4=document.getElementById('r4l'),last4=null;
+  t4.innerHTML='<div class="p4" style="flex:none;height:1px"></div>'+V.map(function(v){return '<span class="rw-c'+(v%1?'':' maj')+'">'+(v%1?'':'<b>'+v+'</b>')+'</span>';}).join('')+'<div class="p4" style="flex:none;height:1px"></div>';
+  var c4=[].slice.call(t4.querySelectorAll('.rw-c'));
+  function paint4(){var half=r4.clientWidth/2,c=r4.scrollLeft+half;c4.forEach(function(el,i){var dx=(i*W4+W4/2+half-W4/2)-c,t=Math.min(1,Math.abs(dx)/half);el.style.transform='translateX('+(-dx*t*.28).toFixed(1)+'px) scale('+(1-t*.38).toFixed(3)+')';el.style.opacity=(1-t*.8).toFixed(2);});
+    var v=V[Math.max(0,Math.min(8,Math.round(r4.scrollLeft/W4)))];if(v!==last4){last4=v;l4.innerHTML='<b>RPE '+f(v)+'</b> · '+WORD[v]+' · '+RIR[v];buzz();}}
+  r4.addEventListener('scroll',function(){requestAnimationFrame(paint4);},{passive:true});
+  c4.forEach(function(el,i){el.onclick=function(){r4.scrollTo({left:i*W4,behavior:'smooth'});};});
   // onglets + valeur de départ (8 ou ?rpe=)
   var q=new URLSearchParams(location.search),start=+(q.get('rpe')||8);
   function show(v){[].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.classList.toggle('on',b.dataset.v==v);});[].forEach.call(document.querySelectorAll('.variant'),function(s){s.classList.toggle('on',s.dataset.v==v);});document.getElementById('note').textContent=NOTES[v];
-    requestAnimationFrame(function(){setPads();setTimeout(function(){r1.scrollLeft=V.indexOf(start)*TW;},30);[].forEach.call(r2.querySelectorAll('.p2'),function(p){p.style.width=(r2.clientWidth/2-IW/2)+'px';});r2.scrollLeft=V.indexOf(start)*IW;paint2();lay3();});}
+    requestAnimationFrame(function(){setPads();setTimeout(function(){r1.scrollLeft=V.indexOf(start)*TW;},30);[].forEach.call(r2.querySelectorAll('.p2'),function(p){p.style.width=(r2.clientWidth/2-IW/2)+'px';});r2.scrollLeft=V.indexOf(start)*IW;paint2();lay3();[].forEach.call(t4.querySelectorAll('.p4'),function(p){p.style.width=(r4.clientWidth/2-W4/2)+'px';});setTimeout(function(){r4.scrollLeft=V.indexOf(start)*W4;paint4();},30);});}
   [].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.onclick=function(){show(b.dataset.v);};});
-  v3=start;show(q.get('v')||'1');window.addEventListener('resize',function(){setPads();lay3();paint2();});
+  v3=start;show(q.get('v')||'4');window.addEventListener('resize',function(){setPads();lay3();paint2();});
 })();
 </script></body></html>
