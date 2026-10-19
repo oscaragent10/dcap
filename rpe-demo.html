@@ -109,9 +109,48 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
 .rpe-wheel:focus-visible .rw-frame{outline:2px solid var(--rw-tick); outline-offset:3px}
 
 .rpe-wheel{--rw-ink:var(--ink);--rw-tick:#B9B09C;--rw-ridge:rgba(31,36,34,.10);--rw-shade:rgba(31,36,34,.07);--rw-frame-fill:rgba(233,194,58,.22);--rw-font:var(--head)}
+
+/* ---------- v55 : molette RPE v2 de Claude (boîtier, roue pleine largeur) — hauteur = 75 % d'une ligne de série (--rw-h, posée en JS) ---------- */
+.rpe-wheel.v2{--rw-h:34px;--rw-bg:transparent;--rw-edge:var(--line);--rw-ink:var(--ink);--rw-dim:#9A9384;--rw-tick:#C4BBA8;--rw-sel:var(--green);
+  --rw-ridge:rgba(31,36,34,.12);--rw-shade:rgba(31,36,34,.07);--rw-font:var(--head);
+  position:relative;width:100%;height:var(--rw-h);margin-top:8px;box-sizing:border-box;border:1px solid var(--rw-edge);border-radius:9px;overflow:hidden;background:var(--rw-bg);
+  outline:none;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+  -webkit-mask-image:none;mask-image:none}
+.rpe-wheel.v2.rw-grab{cursor:grabbing}
+.rpe-wheel.v2 .rw-body{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,var(--rw-shade) 0%,transparent 28%,transparent 72%,var(--rw-shade) 100%)}
+.rpe-wheel.v2 .rw-stage{position:absolute;inset:0;overflow:hidden;border-radius:0}
+.rpe-wheel.v2 .rw-ring{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d}
+.rpe-wheel.v2 .rw-it{position:absolute;left:-16px;top:calc(var(--rw-h) / -2);width:32px;height:var(--rw-h);display:grid;place-items:center;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;will-change:transform,opacity;color:var(--rw-dim)}
+.rpe-wheel.v2 .rw-it b{font-family:var(--rw-font);font-weight:700;font-size:15px;line-height:1;font-variant-numeric:tabular-nums;transition:font-size .12s,color .12s}
+.rpe-wheel.v2 .rw-it i{display:block;width:1.5px;height:7px;border-radius:2px;background:var(--rw-tick)}
+.rpe-wheel.v2 .rw-it.rw-on b{font-weight:900;font-size:20px}
+.rpe-wheel.v2 .rw-it.rw-on i{width:2.5px;height:13px}
+.rpe-wheel.v2 .rw-rg{position:absolute;left:-.75px;top:calc(var(--rw-h) / -2);width:1.5px;height:var(--rw-h);backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background:linear-gradient(180deg,var(--rw-ridge) 0 4px,transparent 4px calc(100% - 4px),var(--rw-ridge) calc(100% - 4px))}
+.rpe-wheel.v2 .rw-light{position:absolute;inset:0;pointer-events:none;box-shadow:inset 5px 0 5px -5px rgba(31,36,34,.25),inset -5px 0 5px -5px rgba(31,36,34,.25)}
+.rpe-wheel.v2:focus-visible{box-shadow:0 0 0 2px var(--rw-tick)}
+.rpe-wheel.v2 .rw-mk{position:absolute;inset:0;pointer-events:none}
+.rpe-wheel.v2 .rw-mk i{position:absolute;left:50%}
+/* A : chiffre central vert, deux fines lignes verticales façon sélecteur iOS */
+.rpe-wheel.v2.mk-a .rw-on b{color:var(--rw-sel)} .rpe-wheel.v2.mk-a .rw-on i{background:var(--rw-sel)}
+.rpe-wheel.v2.mk-a .rw-mk i{top:4px;bottom:4px;width:1px;background:rgba(31,36,34,.28)}
+.rpe-wheel.v2.mk-a .rw-mk1{margin-left:-17px} .rpe-wheel.v2.mk-a .rw-mk2{margin-left:16px}
+/* B : chiffre central en encre pleine, petites encoches triangulaires en haut et en bas */
+.rpe-wheel.v2.mk-b .rw-on b{color:var(--rw-ink)} .rpe-wheel.v2.mk-b .rw-on i{background:var(--rw-ink)}
+.rpe-wheel.v2.mk-b .rw-mk i{width:0;height:0;margin-left:-5px;border-left:5px solid transparent;border-right:5px solid transparent}
+.rpe-wheel.v2.mk-b .rw-mk1{top:0;border-top:5px solid var(--rw-ink)} .rpe-wheel.v2.mk-b .rw-mk2{bottom:0;border-bottom:5px solid var(--rw-ink)}
+/* C : chiffre central vert, fin trait vert sous le chiffre (et encoche en haut) */
+.rpe-wheel.v2.mk-c .rw-on b{color:var(--rw-sel)} .rpe-wheel.v2.mk-c .rw-on i{background:var(--rw-sel)}
+.rpe-wheel.v2.mk-c .rw-mk1{top:0;width:2px;height:4px;margin-left:-1px;background:var(--rw-sel);border-radius:0 0 1px 1px}
+.rpe-wheel.v2.mk-c .rw-mk2{bottom:2px;width:16px;height:2.5px;margin-left:-8px;background:var(--rw-sel);border-radius:2px}
+/* pas encore de RPE : tout en gris, repère estompé */
+.rpe-wheel.v2.rw-unset .rw-on b{color:var(--rw-dim);font-size:15px;font-weight:700} .rpe-wheel.v2.rw-unset .rw-on i{background:var(--rw-tick);width:1.5px;height:7px}
+.rpe-wheel.v2.rw-unset .rw-mk{opacity:.35}
+.rw-lab b{color:var(--ink)}
 </style></head><body>
 <header><h1>Sélecteur RPE · 3 maquettes</h1><p>Démo à essayer au doigt. Rien n'est enregistré : l'app DCAP n'est pas modifiée.</p></header>
-<div class="tabs"><button data-v="1" class="on">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button><button data-v="4">2 bis · Roue</button><button data-v="5">Claude ✓</button></div>
+<div class="tabs"><button data-v="1" class="on">1 · Règle</button><button data-v="2">2 · Carrousel</button><button data-v="3">3 · Jauge</button><button data-v="4">2 bis · Roue</button><button data-v="5">Claude v1</button><button data-v="6">Claude v2 · A ✓</button><button data-v="7">Claude v2 · B</button><button data-v="8">Claude v2 · C</button></div>
 
 <div class="card">
   <div class="gx-name">Développé couché</div>
@@ -144,6 +183,18 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
     <div class="rw-lab" id="r5l">RPE · faire tourner la molette</div>
   </section>
 
+  <section class="variant" data-v="6">
+    <div class="rpe-wheel v2 mk-a" data-value="START" data-min="6" data-max="10" data-step="0.5"></div>
+    <div class="rw-lab" id="lab6">RPE · faire tourner la molette</div>
+  </section>
+  <section class="variant" data-v="7">
+    <div class="rpe-wheel v2 mk-b" data-value="START" data-min="6" data-max="10" data-step="0.5"></div>
+    <div class="rw-lab" id="lab7">RPE · faire tourner la molette</div>
+  </section>
+  <section class="variant" data-v="8">
+    <div class="rpe-wheel v2 mk-c" data-value="START" data-min="6" data-max="10" data-step="0.5"></div>
+    <div class="rw-lab" id="lab8">RPE · faire tourner la molette</div>
+  </section>
   <section class="variant" data-v="3">
     <div class="rpe-lab"><span class="mono-label">RPE · glisser le curseur</span></div>
     <div class="r3-head"><span class="r3-v" id="r3v">8</span><span class="r3-l" id="r3l"></span></div>
@@ -163,6 +214,9 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
     2:'Carrousel : les nombres défilent, celui du centre grossit dans une fenêtre jaune « muscu » et les voisins s\'estompent. Aimant sur chaque 0,5. Proche du sélecteur iOS horizontal, donc familier. Le plus compact (≈90 px).',
     4:'Roue crantée (version retenue, déployée dans DCAP) : environ 56 px de haut. Chiffres sur les entiers, simple trait sur chaque demi-point (sélectionnable, aimant sur 0,5). Les crans se resserrent et s\'estompent vers les bords. La valeur exacte (,5 compris) s\'affiche sous la roue avec le mot d\'effort et les reps en réserve.',
     5:'Molette de Claude (version testée dans DCAP v54) : vraie roue 3D en perspective, stries, inertie au lâcher, tap sur un cran. Plage 6–10, couleurs et police DCAP.',
+    6:'Claude v2 · A (déployée dans DCAP v55) : pas de boîte. Le chiffre central est plus gros et vert, les autres gris, et deux fines lignes verticales fixes encadrent le centre, comme un sélecteur iOS. Sur un ,5, le trait central devient vert et plus long. Hauteur = 75 % d\'une ligne de série.',
+    7:'Claude v2 · B : chiffre central en encre pleine et plus gros, petites encoches triangulaires fixes en haut et en bas. Sur un ,5, le trait central passe en encre et s\'allonge.',
+    8:'Claude v2 · C : chiffre central vert, petite encoche verte en haut et fin trait vert sous le chiffre. Sur un ,5, le trait central devient vert.',
     3:'Jauge en dégradé vert → or → rouge : on glisse le curseur (ou on tape sur la piste), arrêt sur chaque 0,5. Libellé d\'effort « 8 · 2 reps en réserve ». La couleur aide à voir l\'intensité d\'un coup d\'œil. Seule option sans défilement : précise mais demande un geste plus fin.'};
   // 1 — règle
   var r1=document.getElementById('r1'),t1=document.getElementById('r1t'),TW=30;
@@ -201,7 +255,7 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
   function show(v){[].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.classList.toggle('on',b.dataset.v==v);});[].forEach.call(document.querySelectorAll('.variant'),function(s){s.classList.toggle('on',s.dataset.v==v);});document.getElementById('note').textContent=NOTES[v];
     requestAnimationFrame(function(){setPads();setTimeout(function(){r1.scrollLeft=V.indexOf(start)*TW;},30);[].forEach.call(r2.querySelectorAll('.p2'),function(p){p.style.width=(r2.clientWidth/2-IW/2)+'px';});r2.scrollLeft=V.indexOf(start)*IW;paint2();lay3();[].forEach.call(t4.querySelectorAll('.p4'),function(p){p.style.width=(r4.clientWidth/2-W4/2)+'px';});setTimeout(function(){r4.scrollLeft=V.indexOf(start)*W4;paint4();},30);});}
   [].forEach.call(document.querySelectorAll('.tabs button'),function(b){b.onclick=function(){show(b.dataset.v);};});
-  v3=start;show(q.get('v')||'5');window.addEventListener('resize',function(){setPads();lay3();paint2();});
+  v3=start;show(q.get('v')||'6');window.addEventListener('resize',function(){setPads();lay3();paint2();});
 })();
 </script><script>
 /* Lecture : el.value  ·  écoute : el.addEventListener('change', e => e.detail.value)  ·  écriture : el.setValue(8.5) */
@@ -322,4 +376,124 @@ header p{margin:2px 0 0;font-family:var(--mono);font-size:11px;color:var(--muted
 </script>
 <script>(function(){var w=document.getElementById('r5'),l=document.getElementById('r5l');var W={6:'facile',6.5:'facile +',7:'modéré',7.5:'modéré +',8:'difficile',8.5:'difficile +',9:'très dur',9.5:'quasi max',10:'max'},R={6:'4 reps en réserve',6.5:'3–4 en réserve',7:'3 reps en réserve',7.5:'2–3 en réserve',8:'2 reps en réserve',8.5:'1–2 en réserve',9:'1 rep en réserve',9.5:'0–1 en réserve',10:'aucune en réserve'};
 w.addEventListener('change',function(e){var v=e.detail.value;l.innerHTML='<b>RPE '+String(v).replace('.',',')+'</b> · '+W[v]+' · '+R[v];});})();</script>
+<script>var RW_DEMO=[];  // v55 : molette RPE v2 de Claude (live/rpe-claude/molette-rpe-claude-v2.html), adaptée : hauteur = 75 % d'une ligne de série,
+  // repère discret (variantes A/B/C), faux tap au défilement corrigé, molette souris horizontale seulement, libération des écouteurs.
+  var RpeWheel2 = (function () {
+    var DTH = 14, RIDGE_STEP = 6, rad = function (d) { return d * Math.PI / 180; };
+    var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function init(wheel, live) {
+      if (wheel._rw) return; wheel._rw = true; if (live) live.push(wheel);
+      var MIN = +wheel.dataset.min || 1, MAX = +wheel.dataset.max || 10, STEP = +wheel.dataset.step || 0.5;
+      var N = Math.round((MAX - MIN) / STEP) + 1, i, k;
+      wheel.tabIndex = 0; wheel.setAttribute('role', 'slider');
+      wheel.setAttribute('aria-valuemin', MIN); wheel.setAttribute('aria-valuemax', MAX);
+      wheel.innerHTML = '<div class="rw-body"></div><div class="rw-stage"><div class="rw-ring"></div></div><div class="rw-light"></div><div class="rw-mk"><i class="rw-mk1"></i><i class="rw-mk2"></i></div>';
+      var stage = wheel.querySelector('.rw-stage'), ring = wheel.querySelector('.rw-ring'), items = [], ridges = [];
+      for (i = 0; i < N; i++) {
+        var v = MIN + i * STEP, el = document.createElement('div');
+        el.className = 'rw-it'; el.dataset.i = i;
+        el.innerHTML = v % 1 === 0 ? '<b>' + v + '</b>' : '<i></i>';
+        ring.appendChild(el); items.push(el);
+      }
+      for (k = 0; k < 360 / RIDGE_STEP; k++) { var r = document.createElement('div'); r.className = 'rw-rg'; ring.appendChild(r); ridges.push(r); }
+      var clampI = function (x) { return Math.max(0, Math.min(N - 1, x)); };
+      var R = 160, unit = 40, p = clampI(Math.round(((+wheel.dataset.value || MIN) - MIN) / STEP)), cur = -1, target = p, anim = 0, dragging = false;
+      function show(el, on) { if (el._v !== on) { el.style.visibility = on ? 'visible' : 'hidden'; el._v = on; } }
+      function measure() {
+        if (!wheel.isConnected || !wheel.clientWidth) return;
+        R = Math.max(100, wheel.clientWidth / 2); unit = R * rad(DTH);
+        stage.style.perspective = Math.round(R * 3.2) + 'px'; ring.style.transform = 'translateZ(' + (-R) + 'px)';
+        render(true);
+      }
+      function render(silent) {
+        for (var i = 0; i < N; i++) {
+          var th = (i - p) * DTH, el = items[i];
+          if (Math.abs(th) >= 90) { show(el, false); continue; }
+          show(el, true);
+          el.style.transform = 'rotateY(' + th.toFixed(2) + 'deg) translateZ(' + R + 'px)';
+          el.style.opacity = (0.35 + 0.65 * Math.cos(rad(th))).toFixed(3);
+        }
+        var off = p * DTH;
+        for (var k = 0; k < ridges.length; k++) {
+          var t2 = ((k * RIDGE_STEP - off) % 360 + 540) % 360 - 180, r = ridges[k];
+          if (Math.abs(t2) >= 89) { show(r, false); continue; }
+          show(r, true); r.style.transform = 'rotateY(' + t2.toFixed(2) + 'deg) translateZ(' + R + 'px)';
+        }
+        var idx = clampI(Math.round(p));
+        if (idx !== cur) {
+          if (cur >= 0) items[cur].classList.remove('rw-on');
+          items[idx].classList.add('rw-on'); cur = idx;
+          var v = MIN + idx * STEP;
+          wheel.value = v; wheel.dataset.value = v;
+          wheel.setAttribute('aria-valuenow', v); wheel.setAttribute('aria-valuetext', String(v).replace('.', ','));
+          if (!silent) {
+            wheel.dispatchEvent(new CustomEvent('change', { detail: { value: v }, bubbles: true }));
+            if (dragging && navigator.vibrate) try { navigator.vibrate(3); } catch (e) {}
+          }
+        }
+      }
+      function animateTo(t) {
+        target = clampI(t); cancelAnimationFrame(anim);
+        var from = p, d = target - from;
+        if (reduce || Math.abs(d) < 1e-3) { p = target; render(); return; }
+        var dur = Math.min(900, Math.max(240, 220 + Math.abs(d) * 55)), t0 = performance.now();
+        var step = function (now) { var q = Math.min(1, (now - t0) / dur); p = from + d * (1 - Math.pow(1 - q, 3)); render(); if (q < 1) anim = requestAnimationFrame(step); };
+        anim = requestAnimationFrame(step);
+      }
+      wheel.setValue = function (v) { animateTo(Math.round((v - MIN) / STEP)); };
+      var x0 = 0, p0 = 0, moved = 0, samples = [];
+      wheel.addEventListener('pointerdown', function (e) {
+        if (e.button > 0) return;
+        cancelAnimationFrame(anim); dragging = true; moved = 0; x0 = e.clientX; p0 = p;
+        samples = [{ t: e.timeStamp, x: e.clientX }]; wheel.classList.add('rw-grab');
+        try { wheel.setPointerCapture(e.pointerId); } catch (err) {}
+      });
+      wheel.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        var dx = e.clientX - x0; moved = Math.max(moved, Math.abs(dx));
+        var np = p0 - dx / unit;
+        if (np < 0) np *= 0.3; else if (np > N - 1) np = N - 1 + (np - (N - 1)) * 0.3;
+        p = np; render();
+        samples.push({ t: e.timeStamp, x: e.clientX });
+        while (samples.length > 2 && e.timeStamp - samples[0].t > 100) samples.shift();
+      });
+      function release(e) {
+        if (!dragging) return; dragging = false; wheel.classList.remove('rw-grab');
+        if (e.type === 'pointercancel') { animateTo(Math.round(p0)); return; } // intégration DCAP : défilement vertical pris par le navigateur → retour au cran de départ
+        if (moved < 8) {
+          var hit = document.elementsFromPoint(e.clientX, e.clientY).filter(function (n) { return n.classList && n.classList.contains('rw-it') && wheel.contains(n); })[0];
+          animateTo(hit ? +hit.dataset.i : Math.round(p)); return;
+        }
+        var a = samples[0], b = samples[samples.length - 1], dt = Math.max(16, b.t - a.t);
+        animateTo(Math.round(p - (b.x - a.x) / dt / unit * 240));
+      }
+      wheel.addEventListener('pointerup', release);
+      wheel.addEventListener('pointercancel', release);
+      wheel.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      var acc = 0;
+      wheel.addEventListener('wheel', function (e) {
+        if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return; // intégration DCAP : geste vertical = défilement de la page
+        e.preventDefault(); acc += e.deltaX;
+        var n = 0; while (Math.abs(acc) >= 28) { n += Math.sign(acc); acc -= Math.sign(acc) * 28; }
+        if (n) animateTo(target + n);
+      }, { passive: false });
+      wheel.addEventListener('keydown', function (e) {
+        var m = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 2, PageDown: -2 };
+        if (e.key in m) { e.preventDefault(); animateTo(target + m[e.key]); }
+        else if (e.key === 'Home') { e.preventDefault(); animateTo(0); }
+        else if (e.key === 'End') { e.preventDefault(); animateTo(N - 1); }
+      });
+      var ro = null;
+      if (window.ResizeObserver) { ro = new ResizeObserver(measure); ro.observe(wheel); } else window.addEventListener('resize', measure);
+      wheel._rwDestroy = function () { cancelAnimationFrame(anim); if (ro) ro.disconnect(); else window.removeEventListener('resize', measure); };
+      measure();
+    }
+    return { init: init };
+  })();
+
+(function(){var q=new URLSearchParams(location.search),st=+(q.get('rpe')||8);var W={6:'facile',6.5:'facile +',7:'modéré',7.5:'modéré +',8:'difficile',8.5:'difficile +',9:'très dur',9.5:'quasi max',10:'max'},R={6:'4 reps en réserve',6.5:'3–4 en réserve',7:'3 reps en réserve',7.5:'2–3 en réserve',8:'2 reps en réserve',8.5:'1–2 en réserve',9:'1 rep en réserve',9.5:'0–1 en réserve',10:'aucune en réserve'};
+var row=document.querySelector('.set');
+document.querySelectorAll('.rpe-wheel.v2').forEach(function(w){w.dataset.value=st;w.style.setProperty('--rw-h',Math.round(row.offsetHeight*.75)+'px');var l=w.nextElementSibling;
+ var put=function(v){l.innerHTML='<b>RPE '+String(v).replace('.',',')+'</b> · '+W[v]+' · '+R[v];};put(st);w.addEventListener('change',function(e){put(e.detail.value);});RpeWheel2.init(w,RW_DEMO);});})();
+</script>
 </body></html>
