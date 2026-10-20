@@ -918,7 +918,7 @@
     d.cells.forEach(function (c, i) {
       var dc = dayContent(c); wkKm += dc.km;
       var cls = 'md' + (c.in_month ? '' : ' out') + (c.is_today ? ' today' : '') + (c.date === d.horizon ? ' horizon' : '') + (dc.html ? '' : ' empty');
-      var gym = (c.strength || []).length ? '<i class="gymdot" title="Muscu">M</i>' : '';
+      var gym = (c.strength || []).length ? '<i class="gymdot" title="Muscu">M</i>' : (c.gym_plans || []).length ? '<i class="gymdot plan" title="Muscu prévue">M</i>' : '';
       var sd = (c.other || []).slice(0, 3).map(function (o) { return '<i class="sdot sp-' + esc(o.type) + '" title="' + esc(o.label || TYPE_LBL[o.type]) + '"></i>'; }).join('');
       if (gym || sd) { cls = cls.replace(' empty', ''); gym = '<span class="mk">' + gym + sd + '</span>'; }
       h += '<div class="' + cls + '" data-day="' + c.date + '" role="button" tabindex="0" aria-label="' + dayLabel(c.date) + '"><span class="dn">' + (+c.date.slice(8, 10)) + '</span>' + dc.html + gym + '</div>';
@@ -954,12 +954,14 @@
         '<span class="tx"><b>' + esc(it.title || it.type) + '</b><span>' + meta + '</span></span><span class="go">›</span></button>';
     });
     (c.other || []).forEach(function (o) { h += '<button class="it sp-' + esc(o.type) + '" data-oact="' + esc(o.activity_id) + '"><span class="sbig">' + esc(sportTag(o).charAt(0)) + '</span><span class="tx"><b>' + esc(o.name || TYPE_LBL[o.type]) + '</b><span>' + sportMeta(o).join(' · ').replace(/<[^>]+>/g, '') + '</span></span><span class="go">›</span></button>'; });
+    (c.gym_plans || []).forEach(function (g) { h += '<div class="it gymit plan" data-gym="' + esc(g.plan_id) + '" role="button" tabindex="0"><i class="gymdot plan">M</i><span class="tx"><b>Muscu prévue' + (g.title ? ' · ' + esc(g.title) : '') + '</b><span>' + (g.status === 'missed' ? 'manquée' : 'à faire') + '</span></span></div>'; });
     (c.strength || []).forEach(function (g) { h += '<div class="it gymit"><i class="gymdot">M</i><span class="tx"><b>Muscu' + (g.kind ? ' · ' + esc(g.kind) : '') + '</b><span>' + hm(g.duration_s) + (g.avg_hr ? ' · FC ' + g.avg_hr : '') + '</span></span></div>'; });
-    if (!c.races.length && !list.length && !(c.strength || []).length && !(c.other || []).length) h += '<div class="empty">' + (date < d.today ? 'Repos.' : c.beyond_horizon ? 'Pas encore planifié.' : 'Rien de prévu.') + '</div>';
+    if (!c.races.length && !list.length && !(c.strength || []).length && !(c.gym_plans || []).length && !(c.other || []).length) h += '<div class="empty">' + (date < d.today ? 'Repos.' : c.beyond_horizon ? 'Pas encore planifié.' : 'Rien de prévu.') + '</div>';
     h += '</div><div class="row" style="margin-top:6px"><button class="btn btn-ghost" id="m-week">Voir la semaine</button></div>';
     $('#modal-box').innerHTML = h; $('#modal').classList.add('open');
     $('#m-close').onclick = closeModal;
     $('#m-week').onclick = function () { closeModal(); go('week', { day: date }); };
+    $$('.dsheet [data-gym]').forEach(function (b) { b.onclick = function () { closeModal(); go('gym', { plan_id: b.getAttribute('data-gym') }); }; });
     $$('.dsheet [data-oact]').forEach(function (b) { b.onclick = function () { closeModal(); go('detail', { id: b.getAttribute('data-oact') }); }; });
     $$('.dsheet button.it:not([data-oact])').forEach(function (b) {
       b.onclick = function () {
