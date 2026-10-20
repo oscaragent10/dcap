@@ -1946,7 +1946,7 @@
     function send(text, ref) {
       C.sending = true;
       var r0 = ref !== undefined && ref !== null ? ref : C.ctx;
-      C.msgs.push({ role: 'user', text: text + (r0 ? '\n\n[contexte : ' + r0 + ']' : ''), ts: etNow(), status: 'pending' });
+      C.msgs.push({ role: 'user', text: text + (r0 ? '\n\n[contexte : ' + r0 + ']' : ''), ts: etNow(), status: 'pending', queued: !navigator.onLine });
       setCtx(null); render(true); schedule();
       call('uiSendChat', text, r0 || null).then(function (r) { C.sending = false; apply(r); if (r.queued) toast('Hors ligne : message gardé, envoyé dès le retour du réseau', 4500); if (r.error) toast('Erreur xAI : ' + r.error, 6000); if (r.reply && r.reply.proposal) toast('Nouvelle proposition à valider'); })
         .catch(function (e) { C.sending = false; C.msgs.pop(); render(); input.value = input.value || text; input.dispatchEvent(new Event('input')); fail(e); });
