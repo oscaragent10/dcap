@@ -1638,7 +1638,7 @@
       if (!C.isOpen) return;
       var r = comp.getBoundingClientRect();
       if (MOBILE.matches) {
-        var tb = $('.topbar'); document.documentElement.style.setProperty('--tbh', (tb ? tb.offsetHeight : 57) + 'px');
+        var tb = $('.topbar'); if (tb) document.documentElement.style.setProperty('--tbh', tb.getBoundingClientRect().height + 'px');
         var cover = Math.max(0, Math.round(window.innerHeight - r.top));
         endEl.style.height = (cover + 18) + 'px'; pill.style.bottom = (cover + 12) + 'px';
       } else { var cb = $('#chat').getBoundingClientRect(); pill.style.bottom = Math.round(cb.bottom - r.top + 12) + 'px'; }
@@ -1650,18 +1650,26 @@
         if (MOBILE.matches) window.scrollTo({ top: document.documentElement.scrollHeight, behavior: sm ? 'smooth' : 'auto' });
         else box.scrollTo({ top: box.scrollHeight, behavior: sm ? 'smooth' : 'auto' });
       };
-      requestAnimationFrame(function () { doIt(smooth); setTimeout(function () { if (C.stick) doIt(false); }, smooth ? 450 : 120); });
+      requestAnimationFrame(function () { requestAnimationFrame(function () { doIt(smooth); }); [smooth ? 450 : 120, 400, 900].forEach(function (t) { setTimeout(function () { if (C.stick || pinned()) doIt(false); }, t); }); });
     }
     function setPill() {
       var show = C.isOpen && !C.stick && C.unseen; // v66 : seulement s'il y a un nouveau message plus bas
       pill.hidden = !show; pill.classList.toggle('new', C.unseen);
       pill.textContent = C.unseen ? 'Nouveau message ↓' : 'Dernier message ↓';
     }
-    function onScroll() { if (!C.isOpen) return; var nb = nearBottom(); if (nb !== C.stick || (nb && C.unseen)) { C.stick = nb; if (nb) C.unseen = false; setPill(); } }
+    function pinned() { return Date.now() < (C.pinUntil || 0); }
+    function pin(ms) { C.pinUntil = Date.now() + (ms || 3000); C.stick = true; }
+    ['touchstart', 'wheel'].forEach(function (ev) { window.addEventListener(ev, function () { C.pinUntil = 0; }, { passive: true }); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (C.isOpen && C.stick) toEnd(false); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && C.isOpen && C.stick) { pin(1500); toEnd(false); } });
+    function onScroll() { if (!C.isOpen || pinned()) return; var nb = nearBottom(); if (nb !== C.stick || (nb && C.unseen)) { C.stick = nb; if (nb) C.unseen = false; setPill(); } }
     window.addEventListener('scroll', function () { if (MOBILE.matches) onScroll(); }, { passive: true });
     box.addEventListener('scroll', function () { if (!MOBILE.matches) onScroll(); }, { passive: true });
     window.addEventListener('resize', function () { var st = C.stick; layout(); if (st) toEnd(false); });
+    function setTbh() { var tb = $('.topbar'); if (tb) document.documentElement.style.setProperty('--tbh', tb.getBoundingClientRect().height + 'px'); }
+    setTbh();
     if (window.ResizeObserver) {
+      new ResizeObserver(setTbh).observe($('.topbar'));
       new ResizeObserver(function () { var st = C.stick; layout(); if (st && C.isOpen) toEnd(false); }).observe(comp);
       // contenu qui grandit après coup (bandeau de contexte, polices, debriefs) : rester collé au dernier message
       var ro = new ResizeObserver(function () { if (C.isOpen && C.stick) toEnd(false); }); ro.observe(box); ro.observe($('#chat .ch'));
@@ -1887,8 +1895,8 @@
       $('#ch-mark').classList.toggle('busy', waiting());
       suggest();
       C.keys = keys;
-      if (sig === C.sig && !forceEnd) return;
-      var stick = C.stick || nearBottom();
+      if (sig === C.sig && !forceEnd) { if (pinned()) toEnd(false); return; }
+      var stick = C.stick || nearBottom() || pinned();
       C.sig = sig; patch(list);
       if (forceEnd || first || stick) toEnd(!first);
       else if (newCoach) { C.unseen = true; setPill(); }
@@ -1956,7 +1964,7 @@
       if (Wrapper.env && Wrapper.env.stt === 'whisper') Wrapper.send({ type: 'mic-preload' }); // dictée Whisper : préchargement du modèle
       C.isOpen = true; $('#chat').classList.add('open'); setNew(false); if (C.unread) setUnread(C.unread); document.body.classList.add('chat-open'); $('#tab-coach').classList.add('on');
       if (ctx) setCtx(ctx);
-      C.stick = true; layout(); toEnd(); load(); loadBrief(); schedule();
+      pin(3500); layout(); toEnd(); load().then(function () { if (C.stick || pinned()) toEnd(false); }); loadBrief(); schedule();
       if (!MOBILE.matches) setTimeout(function () { input.focus(); }, 50); // mobile : pas de clavier imposé
     }
     function close() {
