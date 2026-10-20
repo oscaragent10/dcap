@@ -1807,7 +1807,7 @@
       var t = m.ts ? String(m.ts).slice(11, 16) : '';
       if (m.role === 'user') {
         var mm = String(m.text).match(/^([\s\S]*?)\n\n\[contexte : ([\s\S]*)\]$/), body = mm ? mm[1] : m.text;
-        var st = m.status === 'error' ? 'erreur' : m.status === 'pending' ? 'envoyé' : 'lu ✓';
+        var st = m.status === 'error' ? 'erreur' : m.queued ? 'en attente de réseau' : m.status === 'pending' ? 'envoyé' : 'lu ✓';
         return '<div class="cm me"><div class="me-b">' + esc(body) + '</div>' + (mm ? '<div class="me-ctx">↳ ' + esc(mm[2]) + '</div>' : '') + '<div class="me-meta">' + t + ' · ' + st + '</div></div>';
       }
       if (m.role === 'system') return '<div class="cm sys' + (/erreur/i.test(m.text) ? ' err' : '') + '">' + esc(m.text) + '</div>';
