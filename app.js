@@ -1631,9 +1631,10 @@
       fp(); fl(); return out.join('');
     }
     // ---- défilement : fenêtre sur téléphone, liste sur ordinateur
-    function nearBottom() {
-      if (MOBILE.matches) return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 140;
-      return box.scrollHeight - box.scrollTop - box.clientHeight < 140;
+    function nearBottom(th) {
+      th = th || 140;
+      if (MOBILE.matches) return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - th;
+      return box.scrollHeight - box.scrollTop - box.clientHeight < th;
     }
     /** Espace sous le dernier message = hauteur réellement couverte par la saisie + onglets + zone sûre (mesurée). */
     function layout() {
@@ -1646,9 +1647,10 @@
       } else { var cb = $('#chat').getBoundingClientRect(); pill.style.bottom = Math.round(cb.bottom - r.top + 12) + 'px'; }
     }
     function toEnd(smooth) {
-      if (!C.isOpen) return;
+      if (!C.isOpen || userBusy()) return;
       layout(); C.stick = true; C.unseen = false; setPill();
       var doIt = function (sm) {
+        if (userBusy()) return; // Paul fait défiler : on ne le ramène pas en bas
         if (MOBILE.matches) window.scrollTo({ top: document.documentElement.scrollHeight, behavior: sm ? 'smooth' : 'auto' });
         else box.scrollTo({ top: box.scrollHeight, behavior: sm ? 'smooth' : 'auto' });
       };
@@ -1661,10 +1663,15 @@
     }
     function pinned() { return Date.now() < (C.pinUntil || 0); }
     function pin(ms) { C.pinUntil = Date.now() + (ms || 3000); C.stick = true; }
-    ['touchstart', 'wheel'].forEach(function (ev) { window.addEventListener(ev, function () { C.pinUntil = 0; }, { passive: true }); });
+    // v73 : doigt posé / inertie → aucun recalage automatique (sinon le fil revient en bas et Paul ne peut pas remonter, surtout clavier ouvert)
+    function userBusy() { return C.touching || Date.now() - (C.userAt || 0) < 900; }
+    window.addEventListener('touchstart', function (e) { if (e.target.closest && e.target.closest('#composer')) return; C.pinUntil = 0; C.touching = true; C.userAt = Date.now(); }, { passive: true });
+    window.addEventListener('touchmove', function () { if (C.touching) C.userAt = Date.now(); }, { passive: true });
+    ['touchend', 'touchcancel'].forEach(function (ev) { window.addEventListener(ev, function () { if (C.touching) { C.touching = false; C.userAt = Date.now(); } }, { passive: true }); });
+    window.addEventListener('wheel', function () { C.pinUntil = 0; C.userAt = Date.now(); }, { passive: true });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (C.isOpen && C.stick) toEnd(false); });
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && C.isOpen && C.stick) { pin(1500); toEnd(false); } });
-    function onScroll() { if (!C.isOpen || pinned()) return; var nb = nearBottom(); if (nb !== C.stick || (nb && C.unseen)) { C.stick = nb; if (nb) C.unseen = false; setPill(); } }
+    function onScroll() { if (!C.isOpen || (pinned() && !userBusy())) return; var nb = userBusy() ? nearBottom(40) : nearBottom(); if (nb !== C.stick || (nb && C.unseen)) { C.stick = nb; if (nb) C.unseen = false; setPill(); } }
     window.addEventListener('scroll', function () { if (MOBILE.matches) onScroll(); }, { passive: true });
     box.addEventListener('scroll', function () { if (!MOBILE.matches) onScroll(); }, { passive: true });
     window.addEventListener('resize', function () { var st = C.stick; layout(); if (st) toEnd(false); });
@@ -2008,7 +2015,7 @@
     });
     if (window.visualViewport) visualViewport.addEventListener('resize', function () {
       if (!C.isOpen || !document.body.classList.contains('kb')) return;
-      layout(); if (C.stick) toEnd(); input.scrollIntoView && document.activeElement === input && input.scrollIntoView({ block: 'nearest' });
+      layout(); if (userBusy()) return; if (C.stick) toEnd(); input.scrollIntoView && document.activeElement === input && input.scrollIntoView({ block: 'nearest' });
     });
     // Dictée : bouton micro → la page enveloppe (oscaragent10.github.io) lance la reconnaissance vocale fr-FR
     var mic = { on: false, base: '', busy: false };
