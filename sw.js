@@ -2,7 +2,7 @@
    Coquille (index.html, manifeste, icônes, worker de dictée) servie depuis le cache tout de suite, puis mise à jour en fond
    (stale-while-revalidate). Seules les ressources de ce site (même origine, GET) sont mises en cache : jamais l'iframe Apps Script,
    ni les données, ni les modèles de dictée (déjà gérés par Transformers.js). */
-var SHELL = 'dcap-shell-v60', SHELL_URLS = ['./', './index.html', './manifest.webmanifest', './icons/dcap-192.png'];
+var SHELL = 'dcap-shell-v61', SHELL_URLS = ['./', './index.html', './manifest.webmanifest', './icons/dcap-192.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(SHELL).then(function (c) { return c.addAll(SHELL_URLS).catch(function () {}); }).then(function () { return self.skipWaiting(); }));
 });
@@ -14,6 +14,7 @@ self.addEventListener('message', function (e) { if (e.data && e.data.type === 'r
 self.addEventListener('fetch', function (e) {
   var r = e.request, u = new URL(r.url);
   if (r.method !== 'GET' || u.origin !== self.location.origin) return;
+  if (/\/beta\//.test(u.pathname)) return; // v61 : la bêta PWA (/dcap/beta/) a son propre service worker
   if (/rpe-demo\.html$/.test(u.pathname)) return; // page de démo : toujours fraîche
   var key = r.mode === 'navigate' ? './index.html' : r;
   e.respondWith(caches.open(SHELL).then(function (c) {
