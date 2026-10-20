@@ -1371,7 +1371,13 @@
   }
 
   // ------------------------------------------------------------------ DÉTAIL SORTIE
-  function loadDetail() { loading(); Promise.all([call('uiActivity', S.activityId), lib('Chart'), lib('L')]).then(function (r) { renderDetail(r[0]); }).catch(fail); }
+  function loadDetail() {
+    var id = S.activityId, shown = null, here = function () { return S.view === 'detail' && S.activityId === id; };
+    var libs = Promise.all([lib('Chart'), lib('L')]);
+    var fast = window.DCAP.peek('uiActivity', [id]).then(function (c) { return c ? libs.then(function () { if (here() && !shown) { shown = JSON.stringify(c); renderDetail(c); } }) : null; }).catch(function () {});
+    setTimeout(function () { if (!shown && here()) loading(); }, 150);
+    Promise.all([call('uiActivity', id), libs, fast]).then(function (r) { if (here() && JSON.stringify(r[0]) !== shown) { shown = JSON.stringify(r[0]); renderDetail(r[0]); } }).catch(function (e) { if (!shown) fail(e); });
+  }
   var SCALE = ['#3DBB6A', '#A4C84A', '#F2C94C', '#F2994A', '#D64545']; // intensité croissante
   function quantiles(vals, qs) { var v = vals.filter(function (x) { return x !== null && isFinite(x); }).sort(function (a, b) { return a - b; }); return qs.map(function (q) { return v.length ? v[Math.min(v.length - 1, Math.floor(q * v.length))] : null; }); }
   /** Fiche d'un autre sport (marche, natation, vélo, autre) ou d'une séance de muscu : stats adaptées, pas de carte ni de splits. */
@@ -1581,6 +1587,7 @@
 
   // Coach v30 : fil « carnet de terrain » (cartes coach, debriefs, propositions à valider), bandeau de contexte,
   // suggestions, attente animée + interrogation du serveur, défilement fiable jusqu'au dernier message (iPhone).
+  window.addEventListener('dcap-flushed', function () { try { Chat.load(); } catch (e) {} });
   var Chat = (function () {
     var C = { msgs: [], props: {}, acts: {}, qsel: {}, pending: 0, mode: '', timer: null, isOpen: false, ctx: null, sending: false, seen: 0,
       brief: null, briefAt: 0, keys: null, sig: '', stick: true, unseen: false, tick: null, copyT: {} };
@@ -1673,7 +1680,9 @@
       if (C.isOpen) C.seen = nAssist; else if (!C.seen) C.seen = nAssist;
       render(); schedule();
     }
+    var briefPeek = false;
     function loadBrief(force) {
+      if (!briefPeek && !C.brief) { briefPeek = true; window.DCAP.peek('uiCoachBrief', []).then(function (b) { if (b && !C.brief) { C.brief = b; strip(); render(); } }); }
       if (!force && C.brief && Date.now() - C.briefAt < 300000) return;
       C.briefAt = Date.now();
       call('uiCoachBrief').then(function (b) {
@@ -1694,7 +1703,8 @@
     function elapsed() { var o = oldestPending(), s = o ? Math.max(0, Math.round((Date.now() - tsMs(o.ts)) / 1000)) : 0; return s > 180 ? Math.floor(s / 60) + ' min' : Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
     function sentAt() { var o = oldestPending(), d = o ? new Date(tsMs(o.ts)) : new Date(); return d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2); } // v61 : heure d'envoi réelle (avant : seule la durée m:ss s'affichait, lue comme une heure)
     function lateNow() { var o = oldestPending(); return !!(o && Date.now() - tsMs(o.ts) > 180000); }
-    function load() { return call('uiChat', null).then(apply).catch(function (e) { console.warn(e); schedule(); }); }
+    var peeked = false;
+    function load() { if (!peeked) { peeked = true; window.DCAP.peek('uiChat', []).then(function (c) { if (c && !C.msgs.length) apply(c); }); } return call('uiChat', null).then(apply).catch(function (e) { console.warn(e); schedule(); }); }
 
     // v41 : bandeau de contexte retiré (trop de place) ; les suggestions gardent le contexte
     function strip() { suggest(); }
@@ -1938,7 +1948,7 @@
       var r0 = ref !== undefined && ref !== null ? ref : C.ctx;
       C.msgs.push({ role: 'user', text: text + (r0 ? '\n\n[contexte : ' + r0 + ']' : ''), ts: etNow(), status: 'pending' });
       setCtx(null); render(true); schedule();
-      call('uiSendChat', text, r0 || null).then(function (r) { C.sending = false; apply(r); if (r.error) toast('Erreur xAI : ' + r.error, 6000); if (r.reply && r.reply.proposal) toast('Nouvelle proposition à valider'); })
+      call('uiSendChat', text, r0 || null).then(function (r) { C.sending = false; apply(r); if (r.queued) toast('Hors ligne : message gardé, envoyé dès le retour du réseau', 4500); if (r.error) toast('Erreur xAI : ' + r.error, 6000); if (r.reply && r.reply.proposal) toast('Nouvelle proposition à valider'); })
         .catch(function (e) { C.sending = false; C.msgs.pop(); render(); input.value = input.value || text; input.dispatchEvent(new Event('input')); fail(e); });
     }
     function setCtx(c) { C.ctx = c; $('#ctx-chip').style.display = c ? 'flex' : 'none'; $('#ctx-text').textContent = c ? 'À propos de : ' + c : ''; }

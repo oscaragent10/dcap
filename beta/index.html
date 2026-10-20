@@ -1017,16 +1017,16 @@ body.panel-open .tabbar{display:none!important}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '67-b1'; window.UI_TOKEN = null;
+    window.APP_BUILD = '68-b2'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=67"></script>
-  <script src="bridge.js?b=67"></script>
+  <script src="api.js?b=68"></script>
+  <script src="bridge.js?b=68"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=67'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=68'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur
