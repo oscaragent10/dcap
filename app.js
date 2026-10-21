@@ -2138,6 +2138,15 @@
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') checkVersion(); });
   setTimeout(checkVersion, 2500);
+  // v75 : mise à jour auto (pwa/updater.js) — occupation, brouillons, toast après rechargement
+  window.DCAP_APP = {
+    busy: function () { var a = document.activeElement; if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return true;
+      if ($('#modal').classList.contains('open')) return true; if (G && (G.inflight || G.saveSt === 'pending')) return true; return false; },
+    save: function () { try { if (G && G.dirty) localStorage.setItem(G.key, JSON.stringify({ t: Date.now(), ex: G.ex, note: G.note })); } catch (e) {}
+      try { var v = $('#chat-input').value; if (v) localStorage.setItem('dcap-chat-draft', v); } catch (e) {} }
+  };
+  try { var cd = localStorage.getItem('dcap-chat-draft'); if (cd && !$('#chat-input').value) { $('#chat-input').value = cd; $('#chat-input').dispatchEvent(new Event('input')); } localStorage.removeItem('dcap-chat-draft'); } catch (e) {}
+  try { if (sessionStorage.getItem('dcap-updated')) { sessionStorage.removeItem('dcap-updated'); setTimeout(function () { toast('Mis à jour', 2200); }, 600); } } catch (e) {}
   navRestore();
   if (S.view !== 'week') { hideSplash(); setTimeout(function () { if (S.curMonday) prefetchWeeks(S.curMonday); }, 1500); }
   setTimeout(hideSplash, 12000); // filet de sécurité
