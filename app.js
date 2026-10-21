@@ -1323,31 +1323,59 @@
     $('#glegend').innerHTML = '<span><i class="sq" style="background:' + PAL.route + '"></i>Route</span><span><i class="sq" style="background:' + PAL.trail + '"></i>Trail</span>' +
       '<span><i class="ln" style="border-color:#E8A830"></i>Cible</span><span><i class="ln dash" style="border-color:#1F2422"></i>Projection</span><span><i class="ln" style="border-color:#8B5E34"></i>D+ (bande du haut)</span>' +
       present.map(function (t) { return '<span><i class="dot" style="background:' + PAL[t] + '"></i>' + TYPE_LBL[t] + '</span>'; }).join('');
-    var setView = function (v) {
-      view = Math.max(0, Math.min(N - 1, v));
+    // v74 : glisser fluide — une seule mise à jour du graphique par image (requestAnimationFrame), échelle verticale figée pendant le geste,
+    // inertie à décroissance exponentielle, élastique doux aux bords, puis aimantation sur une semaine (échelle mise à jour une fois à la fin).
+    var drawRaf = 0, gesture = false;
+    var render = function () {
+      drawRaf = 0;
       var xs = chart.options.scales.x; xs.min = view - G_SLOT - 0.5; xs.max = view + (G_VIS - 1 - G_SLOT) + 0.5;
       chart.options.plugins.raceMarkers.center = view;
-      var i = Math.round(view);
-      if (i !== sel) { sel = i; $('#ginfo').innerHTML = graphInfo(W[sel]); var sc = scaleFor(sel); chart.options.scales.y.max = sc.y; chart.options.scales.y2.max = sc.y2; }
+      var i = Math.max(0, Math.min(N - 1, Math.round(view)));
+      if (i !== sel) { sel = i; $('#ginfo').innerHTML = graphInfo(W[sel]); }
+      if (!gesture) { var sc = scaleFor(sel); chart.options.scales.y.max = sc.y; chart.options.scales.y2.max = sc.y2; }
       chart.update('none');
+    };
+    var setView = function (v, free) { view = free ? v : Math.max(0, Math.min(N - 1, v)); if (!drawRaf) drawRaf = requestAnimationFrame(render); };
+    var rubber = function (v) { // au-delà des bords : résistance (max ~1,2 semaine)
+      if (v < 0) return -1.2 * (1 - Math.exp(v / 1.2)); if (v > N - 1) return N - 1 + 1.2 * (1 - Math.exp(-(v - N + 1) / 1.2)); return v;
     };
     var raf = 0;
     var animateTo = function (target) {
       cancelAnimationFrame(raf); target = Math.max(0, Math.min(N - 1, Math.round(target)));
-      var from = view, t0 = performance.now(), T = Math.min(320, 140 + Math.abs(target - from) * 40);
-      (function step(t) { var p = Math.min(1, (t - t0) / T), e = 1 - Math.pow(1 - p, 3); setView(from + (target - from) * e); if (p < 1) raf = requestAnimationFrame(step); })(t0);
+      var from = view, t0 = performance.now(), T = Math.min(380, 180 + Math.abs(target - from) * 40);
+      gesture = false; var sc = scaleFor(target); chart.options.scales.y.max = sc.y; chart.options.scales.y2.max = sc.y2; // échelle : une fois
+      (function step(t) { var p = Math.min(1, (t - t0) / T), e = 1 - Math.pow(1 - p, 3); setView(from + (target - from) * e, true); if (p < 1) raf = requestAnimationFrame(step); })(t0);
     };
-    // Glisser (doigt : appui long ou glissé horizontal ; souris : cliquer-glisser) → tout le graphique défile sous la case 12.
-    // Touche simple → la semaine touchée vient en case 12. Glissé vertical d'emblée → défilement normal de la page.
-    var cv = $('#g'), box = $('#gbox'), lp = 0, pan = false, sx = 0, sy = 0, v0 = 0, moved = false, lastX = 0, lastT = 0, vel = 0;
+    var glide = function (velSlots) { // velSlots : semaines / ms
+      cancelAnimationFrame(raf); var last = performance.now(), v = velSlots;
+      (function step(t) {
+        var dt = Math.min(32, t - last); last = t;
+        v *= Math.exp(-dt / 325); // décroissance exponentielle (~iOS)
+        var nx = view + v * dt;
+        if (nx < 0 || nx > N - 1) { v *= Math.exp(-dt / 60); nx = rubber(nx); } // freinage fort au-delà du bord
+        setView(nx, true);
+        if (Math.abs(v) > 0.0008 && nx > -1.1 && nx < N + 0.1) raf = requestAnimationFrame(step); else animateTo(view);
+      })(last);
+    };
+    // Glisser (doigt : glissé horizontal ; souris : cliquer-glisser) → tout le graphique défile sous la case 12.
+    // Touche simple → la semaine touchée vient en case 12. Glissé vertical → défilement normal de la page (touch-action: pan-y).
+    var cv = $('#g'), box = $('#gbox'), lp = 0, pan = false, sx = 0, sy = 0, v0 = 0, moved = false, samples = [];
+    cv.style.touchAction = 'pan-y';
     var slotW = function () { var x = chart.scales.x; return Math.max(8, x.getPixelForValue(1) - x.getPixelForValue(0)); };
     var valAt = function (px) { var r = cv.getBoundingClientRect(); return chart.scales.x.getValueForPixel(px - r.left); };
-    var start = function (x, y) { cancelAnimationFrame(raf); sx = lastX = x; sy = y; v0 = view; pan = false; moved = false; vel = 0; lastT = performance.now(); };
-    var beginPan = function () { pan = true; box.classList.add('scrub'); };
-    var move = function (x) { var t = performance.now(), dt = Math.max(1, t - lastT); vel = 0.8 * ((x - lastX) / dt) + 0.2 * vel; lastX = x; lastT = t; setView(v0 - (x - sx) / slotW()); };
+    var start = function (x, y) { cancelAnimationFrame(raf); sx = x; sy = y; v0 = view; pan = false; moved = false; samples = [{ x: x, t: performance.now() }]; };
+    var beginPan = function () { pan = true; gesture = true; box.classList.add('scrub'); v0 = view; };
+    var move = function (x) {
+      var t = performance.now(); samples.push({ x: x, t: t }); while (samples.length > 2 && t - samples[0].t > 100) samples.shift();
+      setView(rubber(v0 - (x - sx) / slotW()), true);
+    };
     var finish = function (x, tap) {
       clearTimeout(lp); box.classList.remove('scrub');
-      if (pan) { var fling = Math.abs(vel) > 0.35 ? -vel * 160 / slotW() : 0; animateTo(view + Math.max(-4, Math.min(4, fling))); }
+      if (pan) {
+        var a = samples[0], b = samples[samples.length - 1], dt = b.t - a.t, vel = dt > 0 && performance.now() - b.t < 80 ? (b.x - a.x) / dt : 0; // px/ms
+        var vs = -vel / slotW();
+        if (Math.abs(vs) > 0.002 && view >= 0 && view <= N - 1) glide(vs); else animateTo(view);
+      }
       else if (tap) { var v = Math.round(valAt(x)); if (v >= 0 && v < N) animateTo(v); }
       pan = false;
     };
@@ -1356,14 +1384,14 @@
       if (e.touches.length !== 1) return;
       var t = e.touches[0], dx = Math.abs(t.clientX - sx), dy = Math.abs(t.clientY - sy);
       if (dx > 6 || dy > 6) moved = true;
-      if (!pan) { if (dx > 8 && dx > dy) { clearTimeout(lp); beginPan(); } else if (dy > 8) { clearTimeout(lp); return; } else return; }
-      if (e.cancelable) e.preventDefault(); move(t.clientX);
-    }, { passive: false });
+      if (!pan) { if (dx > 6 && dx > dy) { clearTimeout(lp); beginPan(); sx = t.clientX; } else if (dy > 8) { clearTimeout(lp); return; } else return; }
+      move(t.clientX);
+    }, { passive: true });
     cv.addEventListener('touchend', function (e) { var t = e.changedTouches[0]; finish(t ? t.clientX : sx, !moved && !pan); });
     cv.addEventListener('touchcancel', function () { finish(sx, false); });
     cv.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return; e.preventDefault(); start(e.clientX, e.clientY);
-      var mm = function (ev) { if (!pan && Math.abs(ev.clientX - sx) > 4) { moved = true; beginPan(); } if (pan) move(ev.clientX); };
+      var mm = function (ev) { if (!pan && Math.abs(ev.clientX - sx) > 4) { moved = true; beginPan(); sx = ev.clientX; } if (pan) move(ev.clientX); };
       var mu = function (ev) { document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); finish(ev.clientX, !moved); };
       document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
     });
