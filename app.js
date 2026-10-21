@@ -423,7 +423,8 @@
   function gymTarget(p) {
     var r = p.reps_min ? (p.reps_max && p.reps_max !== p.reps_min ? p.reps_min + '–' + p.reps_max : p.reps_min) + (p.reps_unit === 's' ? ' s' : '') : '';
     var w = p.weight_lbs !== null && p.weight_lbs !== undefined ? (p.bodyweight ? 'PDC +' : '') + String(p.weight_lbs).replace('.', ',') + ' lbs' : (p.weight_text || '');
-    return [(p.sets ? p.sets + '×' : '') + r, w].filter(Boolean).join(' · ') + (p.unilateral ? ' · /côté' : '');
+    var rs = +p.rest_s > 0 ? ' · récup ' + (p.rest_s >= 60 ? Math.floor(p.rest_s / 60) + "'" + (p.rest_s % 60 ? ('0' + p.rest_s % 60).slice(-2) : '') : p.rest_s + ' s') : '';
+    return [(p.sets ? p.sets + '×' : '') + r, w].filter(Boolean).join(' · ') + (p.unilateral ? ' · /côté' : '') + rs;
   }
   function gymFromParsed(p) {
     var nSets = p.sets || 3, reps = p.reps_max || p.reps_min || null, w = p.weight_lbs === undefined ? null : p.weight_lbs, sets = [];
@@ -1426,7 +1427,7 @@
     h += '<div class="card stats sp-' + esc(t) + '" style="border-left:3px solid var(--c)">' + c.filter(Boolean).join('') + '</div>';
     h += '<div class="panel" style="margin-top:10px"><div class="ttl">' + (t === 'muscu' ? 'Muscu' : 'Autre activité') + '</div>' +
       (t === 'muscu' ? 'Séance de renforcement.' : 'Hors km course : ne compte ni dans la cible hebdo, ni dans la projection, ni dans la charge ACWR.') +
-      (d.debrief && d.debrief.text ? '<div class="debrief" style="margin-top:8px">' + esc(d.debrief.text) + '</div>' : '') + '</div>';
+      (d.debrief && d.debrief.text ? '<div class="debrief cmd" style="margin-top:8px">' + (mdRender ? mdRender(d.debrief.text) : esc(d.debrief.text)) + '</div>' : '') + '</div>';
     $('#view').innerHTML = h;
     $('#back').onclick = function () { go(S.from || 'week'); };
   }
@@ -1445,8 +1446,8 @@
       '<div class="row" style="justify-content:space-between;padding:6px 4px 2px"><div class="seg"><button data-cb="pace" class="' + (S.colorBy === 'pace' ? 'on' : '') + '">Allure</button><button data-cb="hr" class="' + (S.colorBy === 'hr' ? 'on' : '') + '">FC</button></div><div class="map-legend" id="mleg"></div></div></div></div>';
     // Debrief puis splits (sur téléphone : splits d'abord, voir .detail-tail)
     h += '<div class="detail-tail"><div class="dbf"><div class="sec"><h2><span class="n">✎</span>Debrief</h2><div class="right"><span class="mono-label" title="Valeur Garmin (lecture seule)">RPE ' + (a.rpe ? '<b class="rpe-v">' + esc(a.rpe) + '</b>/10' : '–') + '</span></div></div>';
-    h += '<div class="panel"><div class="ttl">' + (d.debrief.from_coach ? 'Debrief coach' : d.debrief.auto ? 'Résumé auto · en attente du debrief coach' : 'Notes') + '</div><div class="debrief">' +
-      esc(String(d.debrief.text).replace(/^\[Coach\]\s*/, '')) + '</div></div></div>';
+    h += '<div class="panel"><div class="ttl">' + (d.debrief.from_coach ? 'Debrief coach' : d.debrief.auto ? 'Résumé auto · en attente du debrief coach' : 'Notes') + '</div><div class="debrief cmd">' +
+      (mdRender ? mdRender(String(d.debrief.text).replace(/^\[Coach\]\s*/, '')) : esc(String(d.debrief.text).replace(/^\[Coach\]\s*/, ''))) + '</div></div></div>';
     // Splits
     h += '<div class="spl"><div class="sec"><h2><span class="n">≡</span>Splits</h2></div><div class="card" style="overflow-x:auto"><table class="tbl"><thead><tr><th>Km</th><th class="opt-m">Temps</th><th>Allure</th><th>GAP</th><th>FC</th><th>D+</th><th class="opt">D-</th><th class="opt">Pente</th></tr></thead><tbody>';
     var paces = sp.map(function (s) { return +s.pace_s_km; }), pmin = Math.min.apply(null, paces), pmax = Math.max.apply(null, paces);
@@ -1617,6 +1618,7 @@
 
   // Coach v30 : fil « carnet de terrain » (cartes coach, debriefs, propositions à valider), bandeau de contexte,
   // suggestions, attente animée + interrogation du serveur, défilement fiable jusqu'au dernier message (iPhone).
+  var mdRender = null;
   window.addEventListener('dcap-flushed', function () { try { Chat.load(); } catch (e) {} });
   var Chat = (function () {
     var C = { msgs: [], props: {}, acts: {}, qsel: {}, pending: 0, mode: '', timer: null, isOpen: false, ctx: null, sending: false, seen: 0,
@@ -1642,6 +1644,7 @@
         .replace(/(^|[\s(«])\*([^*\s][^*]*?)\*(?=[\s).,;:!?»]|$)/g, '$1<i>$2</i>')
         .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     }
+    mdRender = function (t) { return md(t); }; // v76 : même rendu (échappé) pour les debriefs hors du fil
     function md(text) {
       var out = [], list = null, para = [];
       function fp() { if (para.length) { out.push('<p>' + para.map(inl).join('<br>') + '</p>'); para = []; } }
@@ -1864,7 +1867,7 @@
       return '<article class="cm dbc sp-' + (/trail/.test(a.type) ? 'trail' : a.type === 'course' ? 'race' : 'route') + '" data-k="d' + esc(a.activity_id) + '"><header><span class="who"><i class="dot"></i>Debrief</span><time>' + DOW[dowIdx(a.date)] + ' ' + dm(a.date) + (a.start_time ? ' · ' + esc(String(a.start_time).slice(0, 5)) : '') + '</time></header>' +
         '<div class="dbc-t">' + esc(a.name || TYPE_LBL[a.type] || 'Sortie') + '</div>' +
         '<div class="dbc-st"><span><b>' + n(a.distance_km, 1) + '</b>km</span><span><b>' + pace(a.avg_pace_s_km) + '</b>/km</span><span><b>' + (a.avg_hr || '–') + '</b>FC moy</span><span><b>' + (a.d_plus_m ? '+' + n(a.d_plus_m) : '–') + '</b>D+ m</span></div>' +
-        '<div class="cmd dbc-x">' + esc(a.text) + '</div><div class="dbc-f">' + (String(a.text).length > 170 ? '<button class="lnk mut" data-more>Lire tout</button>' : '<span></span>') + '<button class="lnk" data-go="' + esc(a.activity_id) + '">Voir la sortie ›</button></div></article>';
+        '<div class="cmd dbc-x">' + md(a.text) + '</div><div class="dbc-f">' + (String(a.text).length > 170 ? '<button class="lnk mut" data-more>Lire tout</button>' : '<span></span>') + '<button class="lnk" data-go="' + esc(a.activity_id) + '">Voir la sortie ›</button></div></article>';
     }
     function thinkItem() {
       var late = C.late = lateNow();

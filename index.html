@@ -248,7 +248,7 @@ h1,h2,h3{font-family:var(--head);font-weight:800;text-transform:uppercase;letter
 .dsheet .it .tx{flex:1;min-width:0} .dsheet .it .tx b{display:block;font-size:13px} .dsheet .it .tx span{font-size:12px;color:var(--ink-2)}
 .dsheet .it .go{color:var(--muted);font-size:18px}
 .mc .dots{display:none}
-.debrief{white-space:pre-wrap;font-size:13px;line-height:1.55}
+.debrief{white-space:pre-wrap;font-size:13px;line-height:1.55} .debrief.cmd{white-space:normal} .dbc-x p,.debrief.cmd p{margin:0 0 6px}
 .map-legend{display:flex;gap:6px;align-items:center;font-size:10px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
 .map-legend i{display:inline-block;width:18px;height:5px;border-radius:2px}
 
@@ -394,7 +394,7 @@ h1,h2,h3{font-family:var(--head);font-weight:800;text-transform:uppercase;letter
 .dbc-st span{padding:5px 7px;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-left:1px solid var(--line-2);display:flex;flex-direction:column;gap:2px;min-width:0}
 .dbc-st span:first-child{border-left:0}
 .dbc-st b{font-family:var(--head);font-weight:800;font-size:15px;color:var(--ink);letter-spacing:0;text-transform:none;line-height:1}
-.dbc-x{white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.dbc-x{white-space:normal;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .dbc.open .dbc-x{display:block}
 .dbc-f{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
 .lnk{background:none;border:0;font:600 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--green-d);padding:8px 0 0;cursor:pointer}
@@ -1018,17 +1018,17 @@ body.panel-open .tabbar{display:none!important}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '75-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '76-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=75-p7"></script>
-  <script src="bridge.js?b=75-p7"></script>
-  <script src="updater.js?b=75-p7"></script>
+  <script src="api.js?b=76-p7"></script>
+  <script src="bridge.js?b=76-p7"></script>
+  <script src="updater.js?b=76-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=75-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=76-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur
