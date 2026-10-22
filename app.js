@@ -1108,19 +1108,40 @@
     hill_score: 'Capacité en montée, calculée d\'après ta force (côtes courtes et raides) et ton endurance en côte (montées longues).'
   };
   /** Courbe condensée 4 semaines : x = jours, tous les points visibles ; bande optionnelle (plage bas–haut datée). */
-  function pfSpark(id, m, lo, hi, today) {
+  function pfSpark(id, m, lo, hi, today, band) {
     var el = document.getElementById(id); if (!el || !m || !m.history || !m.history.length) return;
     var x0 = Date.parse(today) - 28 * 864e5, X = function (d) { return Math.round((Date.parse(d) - x0) / 864e5); };
     var data = m.history.map(function (p) { return { x: X(p.date), y: p.v, d: p.date }; }), ds = [];
-    if (lo && hi && lo.history.length && hi.history.length) {
+    if (band && band.length) { // v79 : plage optimale grisée (calculée)
+      ds.push({ data: band.map(function (p) { return { x: X(p.date), y: p.hi }; }), borderColor: 'transparent', pointRadius: 0, pointHoverRadius: 0, pointHitRadius: 0, fill: '+1', backgroundColor: 'rgba(31,36,34,.10)', tension: .3 });
+      ds.push({ data: band.map(function (p) { return { x: X(p.date), y: p.lo }; }), borderColor: 'transparent', pointRadius: 0, pointHoverRadius: 0, pointHitRadius: 0, fill: false, tension: .3 });
+    } else if (lo && hi && lo.history.length && hi.history.length) {
       ds.push({ data: hi.history.map(function (p) { return { x: X(p.date), y: p.v }; }), borderColor: 'transparent', pointRadius: 0, fill: '+1', backgroundColor: 'rgba(61,187,106,.16)', stepped: true });
       ds.push({ data: lo.history.map(function (p) { return { x: X(p.date), y: p.v }; }), borderColor: 'transparent', pointRadius: 0, fill: false, stepped: true });
     }
     ds.unshift({ data: data, borderColor: '#2E9A55', backgroundColor: '#2E9A55', borderWidth: 1.8, pointRadius: data.length > 20 ? 2 : 3, pointBackgroundColor: '#2E9A55', tension: .25, fill: false });
     S.charts.push(new Chart(el, { type: 'line', data: { datasets: ds }, options: { responsive: true, maintainAspectRatio: false, animation: false, parsing: true,
-      plugins: { legend: { display: false }, tooltip: { filter: function (it) { return it.datasetIndex === 0; }, callbacks: { title: function (it) { return dm(it[0].raw.d); }, label: function (it) { return pfNum(m, it.parsed.y) + (m.unit ? ' ' + m.unit : ''); } } } },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false }, // v79 : valeur du point le plus proche sur l'axe des x
+      plugins: { legend: { display: false }, tooltip: { mode: 'nearest', axis: 'x', intersect: false, filter: function (it) { return it.datasetIndex === 0; }, callbacks: { title: function (it) { return dm(it[0].raw.d); }, label: function (it) { return pfNum(m, it.parsed.y) + (m.unit ? ' ' + m.unit : ''); } } } },
       scales: { x: { type: 'linear', min: 0, max: 28, display: true, grid: { display: false }, border: { display: false }, ticks: { stepSize: 7, maxRotation: 0, autoSkip: false, font: { size: 9 }, callback: function (v) { return v === 28 ? 'auj.' : '−' + (4 - v / 7) + 's'; } } },
         y: { display: true, position: 'right', grace: '15%', border: { display: false }, grid: { color: 'rgba(0,0,0,.05)' }, ticks: { maxTicksLimit: 3, font: { size: 9 }, callback: function (v) { return m.pace ? pace(v) : n(v, m.dec || 0); } } } } } }));
+  }
+  /** v79 : zone optimale de charge calculée (Garmin n'en publie pas les bornes) : 0,8–1,4 × moyenne de la charge aiguë Garmin sur les 28 j précédents. */
+  function pfBand(L) {
+    var h = (L && L.history) || []; if (h.length < 7) return [];
+    return h.map(function (p) { var w = h.filter(function (q) { return q.date <= p.date && Date.parse(q.date) > Date.parse(p.date) - 28 * 864e5; }), c = w.reduce(function (a, q) { return a + q.v; }, 0) / w.length;
+      return { date: p.date, lo: Math.round(c * 0.8), hi: Math.round(c * 1.4) }; });
+  }
+  var TS_COL = { 'pic': '#8E4FC9', 'productif': '#45B04B', 'maintien': '#B5B31E', 'récupération': '#2E8BD8', 'recuperation': '#2E8BD8', 'improductif': '#F08A24', 'désentraînement': '#E5483B', 'desentrainement': '#E5483B', 'surmenage': '#C8102E', 'tension': '#F26B3A', 'aucun statut': '#A3A8AD' };
+  function tsCol(s) { return TS_COL[String(s || '').toLowerCase().trim()] || '#A3A8AD'; }
+  /** v79 : barre d'historique du statut (segments réellement relevés dans Garmin, 4 dernières semaines) */
+  function pfStatusBar(h, today) {
+    h = (h || []).filter(function (x) { return x.from && x.status; }).sort(function (a, b) { return a.from < b.from ? -1 : 1; }); if (!h.length) return '';
+    var t1 = Date.parse(today), t0 = Math.min(t1 - 28 * 864e5, Date.parse(h[0].from)), span = t1 - t0 + 864e5;
+    var segs = h.map(function (x, i) { var a = Date.parse(x.from), b = Date.parse(x.to || (h[i + 1] ? h[i + 1].from : today)) + (x.to ? 864e5 : 0);
+      return '<span class="pf-ts-s" style="left:' + ((a - t0) / span * 100).toFixed(2) + '%;width:' + (Math.max(0, b - a) / span * 100).toFixed(2) + '%;background:' + tsCol(x.status) + '" title="' + esc(x.status) + '"></span>'; }).join('');
+    var leg = h.map(function (x) { return '<span><b style="background:' + tsCol(x.status) + '"></b>' + esc(x.status) + ' ' + dm(x.from) + (x.to ? '–' + dm(x.to) : '') + '</span>'; }).join('');
+    return '<div class="pf-ts">' + segs + '</div><div class="pf-ts-l">' + leg + '</div>';
   }
   function renderPerf(d) {
     destroyCharts();
@@ -1136,18 +1157,17 @@
     var since = M.training_status_since && M.training_status_since.value ? M.training_status_since.value : null;
     if (since && /^\d{4}-\d{2}-\d{2}$/.test(since)) since = dm(since);
     var L = M.acute_load, lo = M.acute_load_low, hi = M.acute_load_high, ref = d.ref || {}, a = d.acwr.current || {};
-    var ls = M.acute_load_status, range = lo && lo.value && hi && hi.value ? 'plage optimale ' + n(+lo.value) + '–' + n(+hi.value) : (ls && ls.value ? '<span class="pf-tag">' + esc(ls.value) + '</span>' : '');
+    var band = pfBand(L);
+    var ls = M.acute_load_status, range = band.length ? 'zone optimale (calculée) ' + n(band[band.length - 1].lo) + '–' + n(band[band.length - 1].hi) + ' ·' : lo && lo.value && hi && hi.value ? 'plage optimale ' + n(+lo.value) + '–' + n(+hi.value) : (ls && ls.value ? '<span class="pf-tag">' + esc(ls.value) + '</span>' : '');
     var hv = M.hrv_night, h7 = M.hrv_7d, hl = M.hrv_baseline_low, hh = M.hrv_baseline_high, st = M.hrv_status;
     var hrm = M.hr_max, obs = d.hr_max_observed;
     var html = '<div class="pf-head"><h2><span class="n">▮</span>Performance</h2><span class="mono-label">Garmin · relevé ' + (d.last_reading ? dm(d.last_reading) : '—') + '</span></div>' +
       '<div class="pf-grid">' + card('vo2max_run', { big: true }) +
-      card('training_status', { big: true, sub: (since ? 'depuis le ' + esc(since) + ' · ' : '') + dt(M.training_status) }) + '</div>' +
+      card('training_status', { big: true, sub: (since ? 'depuis le ' + esc(since) + ' · ' : '') + dt(M.training_status) + pfStatusBar(d.status_hist, d.today) }) + '</div>' +
       '<h3 class="pf-h">Charge</h3><div class="pf-grid">' +
       '<div class="card pf-c wide"><div class="pf-l">Charge aiguë Garmin</div><div class="pf-v">' + pfVal(L) + '</div><div class="pf-s">' + (range ? range + ' ' : '') + dt(L) + pfDelta(L) + '</div><div class="pf-sp tall"><canvas id="sp-acute_load"></canvas></div></div>' +
       card('load_focus') +
       '<div class="card pf-c"><div class="pf-l">ACWR course (DCAP)</div><div class="pf-v">' + (a.ratio === null || a.ratio === undefined ? '—' : n(a.ratio, 2)) + '</div><div class="pf-s">aiguë 7 j ' + n(a.acute, 0) + ' · chronique 28 j ' + n(a.chronic, 0) + '</div></div></div>' +
-      '<h3 class="pf-h">Seuil lactique</h3><div class="pf-grid">' + card('lt_pace', { label: 'Allure seuil' }) + card('lt_hr', { label: 'FC seuil' }) +
-      '<div class="card pf-c wide"><div class="pf-l">Référence dashboard</div><div class="pf-v">' + (ref.allure_seuil ? esc(ref.allure_seuil) + '<small>/km</small>' : '—') + ' · ' + (ref.fc_seuil ? esc(ref.fc_seuil) + '<small>bpm</small>' : '—') + '</div><div class="pf-s">utilisée pour les cibles des séances' + (ref.fc_max ? ' · FC max réf. ' + esc(ref.fc_max) : '') + '</div></div></div>' +
       '<h3 class="pf-h">Cœur &amp; récup</h3><div class="pf-grid">' +
       card('rhr', { label: 'FC au repos', sub: 'moy. 7 j <b>' + (M.rhr_7d && M.rhr_7d.value ? n(+M.rhr_7d.value, 1) + ' bpm' : '—') + '</b>' + (M.rhr_7d && /calcul/i.test(M.rhr_7d.note || '') ? ' (calculé)' : '') + ' · ' + dt(M.rhr) }) +
       '<div class="card pf-c"><div class="pf-l">VFC (nuit)</div><div class="pf-v">' + pfVal(hv) + '</div><div class="pf-s">moy. 7 j <b>' + (h7 && h7.value ? esc(h7.value) + ' ms' : '—') + '</b> · plage ' + (hl && hl.value && hh && hh.value ? esc(hl.value) + '–' + esc(hh.value) + ' ms' : '—') + '</div>' +
@@ -1161,22 +1181,22 @@
           '<div class="pf-s">' + (qd ? '<span class="pf-tag">' + esc(qd) + '</span>' : '') + (dd ? '<b>' + esc(String(dd).replace(':', 'h')) + '</b>' : '') + '</div>' +
           '<div class="pf-s">moy. 7 j <b>' + (avg !== null ? n(avg) : '—') + '</b> (calculé) · ' + dt(ss) + '</div>' + sp('sleep_score') + '</div>'; })() +
       '</div>' +
-      '<h3 class="pf-h">Scores</h3><div class="pf-grid">' + card('endurance_score', { expl: PF_EXPL.endurance_score }) + card('hill_score', { expl: PF_EXPL.hill_score }) + card('hill_endurance') + card('hill_power') + card('heat_acclim') + '</div>';
+      '<h3 class="pf-h">Seuil lactique</h3><div class="pf-grid">' + card('lt_pace', { label: 'Allure seuil' }) + card('lt_hr', { label: 'FC seuil' }) +
+      '<div class="card pf-c wide"><div class="pf-l">Référence dashboard</div><div class="pf-v">' + (ref.allure_seuil ? esc(ref.allure_seuil) + '<small>/km</small>' : '—') + ' · ' + (ref.fc_seuil ? esc(ref.fc_seuil) + '<small>bpm</small>' : '—') + '</div><div class="pf-s">utilisée pour les cibles des séances' + (ref.fc_max ? ' · FC max réf. ' + esc(ref.fc_max) : '') + '</div></div></div>';
     // Records : le meilleur 10 km officiel = record, le second reste visible
     var prs = d.prs.slice(), tens = prs.filter(function (p) { return /^pr_10k(_official.*)?$/.test(p.key) && p.value; }).sort(function (x, y) { return durMin(x.value) - durMin(y.value); });
     var rows = [];
     prs.forEach(function (p) {
-      if (/^pr_10k_official/.test(p.key)) { if (p.key === 'pr_10k_official') tens.filter(function (t, i, arr) { return arr.findIndex(function (u) { return u.value === t.value; }) === i; }).forEach(function (t, i) { rows.push({ label: i ? '10 km officiel (2e)' : '10 km · record officiel', value: t.value, note: t.note || '', date: t.date }); }); return; }
+      if (/^pr_10k_official/.test(p.key)) { if (p.key === 'pr_10k_official') tens.filter(function (t, i, arr) { return arr.findIndex(function (u) { return u.value === t.value; }) === i; }).forEach(function (t, i) { rows.push({ label: i ? '10 km officiel (2e)' : '10 km officiel', value: t.value, note: t.note || '', date: t.date }); }); return; }
       if (p.key === 'pr_10k') return;
       rows.push(p);
     });
     html += '<h3 class="pf-h">Records</h3><div class="card pf-pr">' + rows.map(function (p) {
-        return '<div class="pf-pr-r"><span>' + esc(p.label) + '</span><b>' + (p.value ? esc(p.value) : '—') + '</b><em>' + (p.note ? esc(p.note) : '') + '</em></div>'; }).join('') + '</div>' +
-      '<div class="sub pf-foot">Valeurs relevées dans Garmin Connect (onglet Perf du Sheet), courbes sur 4 semaines. « — » = pas encore de donnée.</div>';
+        return '<div class="pf-pr-r"><div class="pf-pr-t"><span>' + esc(p.label) + '</span><b>' + (p.value ? esc(p.value) : '—') + '</b></div>' + (p.note ? '<em>' + esc(p.note) + '</em>' : '') + '</div>'; }).join('') + '</div>';
     $('#view').innerHTML = html;
     chartDefaults();
-    ['vo2max_run', 'lt_pace', 'lt_hr', 'rhr', 'sleep_score', 'endurance_score', 'hill_score', 'hill_endurance', 'hill_power', 'heat_acclim'].forEach(function (k) { pfSpark('sp-' + k, M[k], null, null, d.today); });
-    pfSpark('sp-acute_load', L, lo, hi, d.today);
+    ['vo2max_run', 'lt_pace', 'lt_hr', 'rhr', 'sleep_score'].forEach(function (k) { pfSpark('sp-' + k, M[k], null, null, d.today); });
+    pfSpark('sp-acute_load', L, lo, hi, d.today, band);
     pfSpark('sp-hrv_night', hv, hl, hh, d.today);
   }
 
