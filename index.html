@@ -996,6 +996,25 @@ body.panel-open .tabbar{display:none!important}
 .pf-ts .pf-ts-s{position:absolute;top:0;bottom:0;display:block}
 .pf-ts-l{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:10px;color:var(--muted)}
 .pf-ts-l b{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+/* v80 : changement de mois façon « Focus time » + pastille des sélecteurs */
+.mcal-card{position:relative}
+.mcal-card .mt-ghost{position:absolute;left:0;right:0;top:0;pointer-events:none;animation:mtOut 200ms ease both}
+.mcal.mt-in{animation:mtIn 200ms ease both}
+.mcal-card.mt-wait .mcal{opacity:.55;transition:opacity 200ms ease}
+.mt-w{display:inline-grid;vertical-align:baseline}
+.msum .splitlbl{overflow:hidden}
+.mt-w>span{grid-area:1/1;white-space:nowrap}
+.mt-o{animation:mtUp 200ms ease-out both}
+.mt-n{animation:mtFromBelow 200ms ease-out both}
+@keyframes mtOut{to{opacity:0}}
+@keyframes mtIn{from{opacity:0}}
+@keyframes mtUp{to{opacity:0;transform:translateY(-8px)}}
+@keyframes mtFromBelow{from{opacity:0;transform:translateY(8px)}}
+.seg.has-pill{position:relative;isolation:isolate}
+.seg .seg-pill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ink);z-index:-1;transition:transform 300ms cubic-bezier(.4,0,.2,1),width 300ms cubic-bezier(.4,0,.2,1);will-change:transform}
+.seg.has-pill button.on{background:transparent}
+.seg.has-pill button{position:relative}
+@media (prefers-reduced-motion: reduce){.mcal-card .mt-ghost,.mcal.mt-in,.mt-o,.mt-n{animation:none!important}.mt-o{display:none}.seg .seg-pill{transition:none!important}}
 </style>
 
 </head>
@@ -1071,17 +1090,17 @@ body.panel-open .tabbar{display:none!important}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '79-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '80-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=79-p7"></script>
-  <script src="bridge.js?b=79-p7"></script>
-  <script src="updater.js?b=79-p7"></script>
+  <script src="api.js?b=80-p7"></script>
+  <script src="bridge.js?b=80-p7"></script>
+  <script src="updater.js?b=80-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=79-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=80-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur

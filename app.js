@@ -892,7 +892,7 @@
       revalidate(MO, key, 'uiMonth', [y, m], function (d) { if (S.view === 'month' && S.ym[0] === d.year && S.ym[1] === d.month) renderMonth(d); });
       return;
     }
-    loading();
+    if (!$('#view .mcal')) loading(); else $('#view .mcal-card').classList.add('mt-wait');
     fetchMonth(y, m).then(function (d) { if (S.view === 'month' && S.ym[0] === d.year && S.ym[1] === d.month) renderMonth(d); pre(); }).catch(fail);
   }
   // Cercles du mois : aire ∝ km (bornée), couleur = surface (route / trail / course), lettre R / T / C ;
@@ -926,9 +926,15 @@
     }
     return { km: 0, html: '' };
   }
+  var MT_SEL = '.sec h2 .mt, .msum .big, .msum .sub, .splitlbl b, .wk b';
   function renderMonth(d) {
     var mob = MOBILE.matches, S0 = d.summary;
-    var h = '<div class="sec"><h2><span class="n">◷</span>' + MONTHS[d.month - 1] + ' ' + d.year + '</h2><div class="right">' +
+    // v80 : 6 semaines toujours (pas de saut de hauteur d'un mois à l'autre)
+    while (d.cells.length && d.cells.length < 42) { var lc = d.cells[d.cells.length - 1]; d.cells.push({ date: addDays(lc.date, 1), in_month: false, pad: true, items: [], races: [], other: [], strength: [], gym_plans: [] }); }
+    // v80 : passage de mois façon « Focus time » : instantané de l'ancien mois
+    var oldCal = !REDUCED.matches && S.view === 'month' && $('#view .mcal'), oldKey = oldCal && $('#view .mcal-card').getAttribute('data-ym'), oldTx = null;
+    if (oldCal && oldKey !== d.year + '-' + d.month) oldTx = $$(MT_SEL).map(function (e) { return e.innerHTML; }); else oldCal = null;
+    var h = '<div class="sec"><h2><span class="n">◷</span><span class="mt">' + MONTHS[d.month - 1] + ' ' + d.year + '</span></h2><div class="right">' +
       '<span class="mono-label">horizon ' + (d.horizon ? dm(d.horizon) : '–') + '</span>' +
       '<button class="btn btn-ghost btn-sm" data-m="-1" aria-label="Mois précédent">‹</button><button class="btn btn-ghost btn-sm" data-m="0">' + (mob ? 'Auj.' : 'Ce mois') + '</button><button class="btn btn-ghost btn-sm" data-m="1" aria-label="Mois suivant">›</button></div></div>';
     if (S0) {
@@ -943,7 +949,7 @@
         '</div>';
     }
     h += '<div class="mbody">';
-    h += '<div class="card mcal-card"><div class="mcal">' + DOW.map(function (x) { return '<div class="dh">' + x + '</div>'; }).join('') + '<div class="dh wkh">Sem.</div>';
+    h += '<div class="card mcal-card" data-ym="' + d.year + '-' + d.month + '"><div class="mcal">' + DOW.map(function (x) { return '<div class="dh">' + x + '</div>'; }).join('') + '<div class="dh wkh">Sem.</div>';
     var wkKm = 0;
     d.cells.forEach(function (c, i) {
       var dc = dayContent(c); wkKm += dc.km;
@@ -956,6 +962,7 @@
     });
     h += '</div></div></div>';
     $('#view').innerHTML = h;
+    if (oldCal) monthMorph(oldCal, oldTx);
     $$('[data-m]').forEach(function (b) {
       b.onclick = function () {
         var k = +b.getAttribute('data-m'), y = d.year, m = d.month;
@@ -968,6 +975,32 @@
       el.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.onclick(); } };
     });
   }
+  /** v80 : cases en fondu enchaîné simultané (200 ms, sans glissement) ; chiffres et libellés empilés : l'ancien sort vers le haut (−8 px), le nouveau monte de +8 px (200 ms ease-out). */
+  function monthMorph(oldCal, oldTx) {
+    var card = $('#view .mcal-card'), cal = card && card.querySelector('.mcal'); if (!cal) return;
+    var news = $$(MT_SEL);
+    var g = oldCal.cloneNode(true); g.classList.add('mt-ghost'); g.setAttribute('aria-hidden', 'true'); g.querySelectorAll('[data-day]').forEach(function (x) { x.removeAttribute('data-day'); }); card.appendChild(g); cal.classList.add('mt-in');
+    news.forEach(function (e, i) {
+      var o = oldTx[i]; if (o === undefined || o === e.innerHTML) return;
+      e.innerHTML = '<span class="mt-w"><span class="mt-o" aria-hidden="true">' + o + '</span><span class="mt-n">' + e.innerHTML + '</span></span>';
+    });
+    setTimeout(function () {
+      if (g.parentNode) g.parentNode.removeChild(g); cal.classList.remove('mt-in');
+      $$('.mt-w').forEach(function (w) { var n = w.querySelector('.mt-n'), p = w.parentNode; if (p) p.innerHTML = n.innerHTML; });
+    }, 240);
+  }
+  /** v80 : pastille glissante des sélecteurs segmentés (.seg) : 300 ms cubic-bezier(0.4,0,0.2,1), sans rebond */
+  function segPills() {
+    $$('.seg').forEach(function (sg) {
+      var on = sg.querySelector('button.on'), p = sg.querySelector('.seg-pill');
+      if (!p) { p = document.createElement('i'); p.className = 'seg-pill'; p.setAttribute('aria-hidden', 'true'); sg.insertBefore(p, sg.firstChild); sg.classList.add('has-pill'); p.style.transition = 'none'; }
+      if (!on) { p.style.opacity = '0'; return; }
+      p.style.opacity = '1'; p.style.width = on.offsetWidth + 'px'; p.style.transform = 'translateX(' + on.offsetLeft + 'px)';
+      if (p.style.transition === 'none') { void p.offsetWidth; requestAnimationFrame(function () { p.style.transition = ''; }); }
+    });
+  }
+  (function () { var v = document.getElementById('view'), q = 0; if (!v || !window.MutationObserver) return;
+    new MutationObserver(function () { if (q) return; q = requestAnimationFrame(function () { q = 0; if ($$('.seg').length) segPills(); }); }).observe(v, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] }); })();
   function isoW(ymd) { var t = ymdDate(ymd), day = (t.getUTCDay() + 6) % 7; t.setUTCDate(t.getUTCDate() - day + 3); var f = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)); return 1 + Math.round(((t - f) / 864e5 - 3 + ((f.getUTCDay() + 6) % 7)) / 7); }
 
   /** Feuille « jour » (toucher une case du mois) : sorties, séances et course du jour, chacune ouvrable. */
