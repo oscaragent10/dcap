@@ -1692,16 +1692,25 @@
       pill.hidden = !show; pill.classList.toggle('new', C.unseen);
       pill.textContent = C.unseen ? 'Nouveau message ↓' : 'Dernier message ↓';
     }
+    // v77 : recalage direct (scrollTop = scrollHeight) à chaque image pendant ms, + ResizeObserver du fil ; s'arrête dès que le doigt touche le fil
+    function hardEnd(ms) {
+      var t0 = performance.now(), se = function () { return MOBILE.matches ? (document.scrollingElement || document.documentElement) : box; };
+      var go = function () { if (!C.isOpen || userBusy() || !(C.stick || pinned())) return false; var el = se(); el.scrollTop = el.scrollHeight; return true; };
+      go();
+      (function loop(t) { if (go() !== false && t - t0 < ms) requestAnimationFrame(loop); })(t0);
+      if (window.ResizeObserver) { var ro = new ResizeObserver(function () { go(); }); ro.observe(box); setTimeout(function () { ro.disconnect(); }, ms); }
+    }
+    window.addEventListener('pageshow', function () { if (C.isOpen && C.stick) { pin(1500); hardEnd(1500); } });
     function pinned() { return Date.now() < (C.pinUntil || 0); }
     function pin(ms) { C.pinUntil = Date.now() + (ms || 3000); C.stick = true; }
     // v73 : doigt posé / inertie → aucun recalage automatique (sinon le fil revient en bas et Paul ne peut pas remonter, surtout clavier ouvert)
     function userBusy() { return C.touching || Date.now() - (C.userAt || 0) < 900; }
-    window.addEventListener('touchstart', function (e) { if (e.target.closest && e.target.closest('#composer')) return; C.pinUntil = 0; C.touching = true; C.userAt = Date.now(); }, { passive: true });
+    window.addEventListener('touchstart', function (e) { if (e.target.closest && e.target.closest('#composer,.tabbar,.topbar,#bubble,#new-pill,#modal')) return; /* v77 : seul un doigt sur le fil compte (pas l'appui sur l'onglet Coach) */ C.pinUntil = 0; C.touching = true; C.userAt = Date.now(); }, { passive: true });
     window.addEventListener('touchmove', function () { if (C.touching) C.userAt = Date.now(); }, { passive: true });
     ['touchend', 'touchcancel'].forEach(function (ev) { window.addEventListener(ev, function () { if (C.touching) { C.touching = false; C.userAt = Date.now(); } }, { passive: true }); });
     window.addEventListener('wheel', function () { C.pinUntil = 0; C.userAt = Date.now(); }, { passive: true });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (C.isOpen && C.stick) toEnd(false); });
-    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && C.isOpen && C.stick) { pin(1500); toEnd(false); } });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && C.isOpen && C.stick) { pin(1500); toEnd(false); hardEnd(1500); } });
     function onScroll() { if (!C.isOpen || (pinned() && !userBusy())) return; var nb = userBusy() ? nearBottom(40) : nearBottom(); if (nb !== C.stick || (nb && C.unseen)) { C.stick = nb; if (nb) C.unseen = false; setPill(); } }
     window.addEventListener('scroll', function () { if (MOBILE.matches) onScroll(); }, { passive: true });
     box.addEventListener('scroll', function () { if (!MOBILE.matches) onScroll(); }, { passive: true });
@@ -2004,7 +2013,7 @@
       if (Wrapper.env && Wrapper.env.stt === 'whisper') Wrapper.send({ type: 'mic-preload' }); // dictée Whisper : préchargement du modèle
       C.isOpen = true; $('#chat').classList.add('open'); setNew(false); if (C.unread) setUnread(C.unread); document.body.classList.add('chat-open'); $('#tab-coach').classList.add('on');
       if (ctx) setCtx(ctx);
-      pin(3500); layout(); toEnd(); load().then(function () { if (C.stick || pinned()) toEnd(false); }); loadBrief(); schedule();
+      pin(3500); C.touching = false; C.userAt = 0; layout(); toEnd(); hardEnd(1500); load().then(function () { if (C.stick || pinned()) { toEnd(false); hardEnd(800); } }); loadBrief(); schedule();
       if (!MOBILE.matches) setTimeout(function () { input.focus(); }, 50); // mobile : pas de clavier imposé
     }
     function close() {

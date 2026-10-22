@@ -1,7 +1,7 @@
 /* DCAP PWA (bêta) — service worker : coquille hors ligne + bibliothèques CDN + notifications Web Push du coach.
    Les données ne passent jamais par ce cache (API Apps Script en POST, cache IndexedDB géré par api.js). */
-var SHELL = 'dcapb-shell-1a5c19e1d2', LIBS = 'dcapb-libs-v1';
-var SHELL_URLS = ['./index.html', './app.js?b=76-p7', './api.js?b=76-p7', './bridge.js?b=76-p7', './updater.js?b=76-p7', './manifest.webmanifest', './icons/dcap-192.png', './icons/dcap-180.png'];
+var SHELL = 'dcapb-shell-684486b78a', LIBS = 'dcapb-libs-v1';
+var SHELL_URLS = ['./index.html', './app.js?b=77-p7', './api.js?b=77-p7', './bridge.js?b=77-p7', './updater.js?b=77-p7', './manifest.webmanifest', './icons/dcap-192.png', './icons/dcap-180.png'];
 var LIB_HOSTS = /^(cdn\.jsdelivr\.net|unpkg\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)$/;
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(SHELL).then(function (c) { return c.addAll(SHELL_URLS.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));
