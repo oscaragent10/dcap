@@ -57,6 +57,14 @@
   function statusLbl(s) { return { planned: 'prévu', done: 'fait', missed: 'manqué', modified: 'modifié' }[s] || s; }
 
   function destroyCharts() { S.charts.forEach(function (c) { try { c.destroy(); } catch (e) {} }); S.charts = []; if (S.map) { S.map.remove(); S.map = null; } }
+  // v78 : pastille de l'onglet actif qui glisse (200 ms)
+  function tabInd() {
+    var tb = $('#tabbar'); if (!tb) return; var ind = $('#tab-ind');
+    if (!ind) { ind = document.createElement('i'); ind.id = 'tab-ind'; ind.setAttribute('aria-hidden', 'true'); tb.appendChild(ind); }
+    var bs = $$('#tabbar > button'), on = document.body.classList.contains('chat-open') ? $('#tab-coach') : $('#tabbar [data-nav].on'), i = bs.indexOf(on);
+    ind.style.opacity = i < 0 ? '0' : '1'; if (i >= 0) ind.style.transform = 'translateX(' + (i * 100) + '%)';
+  }
+  if (window.MutationObserver) { var tmo = new MutationObserver(function () { tabInd(); }); tmo.observe(document.body, { attributes: true, attributeFilter: ['class'] }); setTimeout(function () { $$('#tabbar > button').forEach(function (b) { tmo.observe(b, { attributes: true, attributeFilter: ['class'] }); }); tabInd(); }, 0); }
   function setNav(v) {
     $$('#nav a').forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-nav') === v); });
     // barre d'onglets mobile : la fiche sortie garde l'onglet d'origine (Semaine ou Mois) actif
@@ -66,7 +74,24 @@
   function loading() { $('#view').innerHTML = '<div class="loading">Chargement…</div>'; }
 
   // ------------------------------------------------------------------ navigation
+  // v78 : transitions — onglets = fondu 150 ms ; fiche (sortie, séance, course) = poussée iOS 300 ms ; retour = inverse.
+  // View Transitions API si disponible (Safari 18+), sinon animation CSS du contenu. Rien si « réduire les animations ».
+  var REDUCED = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+  var DEEP = { detail: 1, gym: 1, race: 1 };
   function go(view, opts) {
+    var prev = S.view, kind = DEEP[view] && !DEEP[prev] ? 'push' : DEEP[prev] && !DEEP[view] ? 'pop' : 'fade';
+    if (!S.booted || REDUCED.matches || prev === view) { S.booted = true; return goNow(view, opts); }
+    var de = document.documentElement;
+    if (document.startViewTransition) {
+      de.setAttribute('data-vt', kind);
+      try { var t = document.startViewTransition(function () { goNow(view, opts); }); t.finished.then(function () { de.removeAttribute('data-vt'); }, function () { de.removeAttribute('data-vt'); }); return; }
+      catch (e) { de.removeAttribute('data-vt'); }
+    }
+    goNow(view, opts);
+    var v = $('#view'); v.classList.remove('vt-fade', 'vt-push', 'vt-pop'); void v.offsetWidth; v.classList.add('vt-' + kind);
+    clearTimeout(v._vt); v._vt = setTimeout(function () { v.classList.remove('vt-' + kind); }, 360);
+  }
+  function goNow(view, opts) {
     opts = opts || {};
     // téléphone : le coach est une page comme les autres ; tout changement d'onglet le quitte
     if (MOBILE.matches && $('#chat').classList.contains('open')) Chat.close();
@@ -382,13 +407,17 @@
       (p.linked_activity_id ? '<button class="btn btn-ghost" id="m-act">Voir la sortie</button>' : '') +
       (p.type === 'muscu' ? '<button class="btn" id="m-gym">Ouvrir la séance</button>' : '') +
       '<button class="btn btn-green" id="m-ask">Demander au coach</button></div>';
-    $('#modal-box').innerHTML = h; $('#modal').classList.add('open');
+    $('#modal-box').innerHTML = h; $('#modal').classList.remove('closing'); $('#modal').classList.add('open');
     $('#m-close').onclick = closeModal;
     $('#m-ask').onclick = function () { closeModal(); Chat.open('séance ' + p.plan_id + ' · ' + p.type + ' du ' + p.date + ' « ' + (p.title || '') + ' »'); };
     var mg = $('#m-gym'); if (mg) mg.onclick = function () { closeModal(); go('gym', { plan_id: p.plan_id }); };
     var ma = $('#m-act'); if (ma) ma.onclick = function () { closeModal(); go('detail', { id: String(p.linked_activity_id) }); };
   }
-  function closeModal() { $('#modal').classList.remove('open'); }
+  function closeModal() { // v78 : la feuille redescend (250 ms) avant de disparaître
+    var m = $('#modal'); if (!m.classList.contains('open')) return;
+    if (REDUCED.matches) { m.classList.remove('open'); return; }
+    m.classList.add('closing'); clearTimeout(m._c); m._c = setTimeout(function () { m.classList.remove('open', 'closing'); }, 250);
+  }
   $('#modal').addEventListener('click', function (e) { if (e.target.id === 'modal') closeModal(); });
 
   // ------------------------------------------------------------------ SÉANCE DE MUSCU (v51)
@@ -959,7 +988,7 @@
     (c.strength || []).forEach(function (g) { h += '<div class="it gymit"><i class="gymdot">M</i><span class="tx"><b>Muscu' + (g.kind ? ' · ' + esc(g.kind) : '') + '</b><span>' + hm(g.duration_s) + (g.avg_hr ? ' · FC ' + g.avg_hr : '') + '</span></span></div>'; });
     if (!c.races.length && !list.length && !(c.strength || []).length && !(c.gym_plans || []).length && !(c.other || []).length) h += '<div class="empty">' + (date < d.today ? 'Repos.' : c.beyond_horizon ? 'Pas encore planifié.' : 'Rien de prévu.') + '</div>';
     h += '</div><div class="row" style="margin-top:6px"><button class="btn btn-ghost" id="m-week">Voir la semaine</button></div>';
-    $('#modal-box').innerHTML = h; $('#modal').classList.add('open');
+    $('#modal-box').innerHTML = h; $('#modal').classList.remove('closing'); $('#modal').classList.add('open');
     $('#m-close').onclick = closeModal;
     $('#m-week').onclick = function () { closeModal(); go('week', { day: date }); };
     $$('.dsheet [data-gym]').forEach(function (b) { b.onclick = function () { closeModal(); go('gym', { plan_id: b.getAttribute('data-gym') }); }; });

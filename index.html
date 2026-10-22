@@ -943,6 +943,54 @@ body.panel-open .tabbar{display:none!important}
   body.kb.chat-open #chat-form{padding-bottom:4px;padding-top:4px}
   #new-pill{padding:4px 10px;font-size:9.5px;letter-spacing:.06em;box-shadow:0 2px 8px rgba(31,36,34,.22)}
 }
+
+/* ===================== v78 : animations (transform / opacity uniquement) ===================== */
+@keyframes vtFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes vtFadeOut{from{opacity:1}to{opacity:0}}
+@keyframes vtPushNew{from{transform:translateX(100%)}to{transform:none}}
+@keyframes vtPushOld{from{transform:none;opacity:1}to{transform:translateX(-25%);opacity:.72}}
+@keyframes vtPopNew{from{transform:translateX(-25%);opacity:.72}to{transform:none;opacity:1}}
+@keyframes vtPopOld{from{transform:none}to{transform:translateX(100%)}}
+@keyframes sheetIn{from{transform:translateY(100%)}to{transform:none}}
+@keyframes sheetOut{from{transform:none}to{transform:translateY(100%)}}
+@keyframes bdIn{from{opacity:0}to{opacity:1}}
+@keyframes bdOut{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion: no-preference){
+  .topbar{view-transition-name:dcap-top} .tabbar{view-transition-name:dcap-tabs} #chat .ch{view-transition-name:dcap-coachbar}
+  ::view-transition-group(dcap-top),::view-transition-group(dcap-tabs),::view-transition-group(dcap-coachbar){animation:none}
+  html[data-vt=fade]::view-transition-old(root){animation:vtFadeOut 150ms ease-in-out both}
+  html[data-vt=fade]::view-transition-new(root){animation:vtFadeIn 150ms ease-in-out both}
+  html[data-vt=push]::view-transition-old(root){animation:vtPushOld 300ms cubic-bezier(.16,1,.3,1) both}
+  html[data-vt=push]::view-transition-new(root){animation:vtPushNew 300ms cubic-bezier(.16,1,.3,1) both}
+  html[data-vt=pop]::view-transition-old(root){animation:vtPopOld 300ms cubic-bezier(.16,1,.3,1) both;z-index:2}
+  html[data-vt=pop]::view-transition-new(root){animation:vtPopNew 300ms cubic-bezier(.16,1,.3,1) both;z-index:1}
+  #view.vt-fade{animation:vtFadeIn 150ms ease-in-out both}
+  #view.vt-push{animation:vtPushNew 300ms cubic-bezier(.16,1,.3,1) both}
+  #view.vt-pop{animation:vtPopNew 300ms cubic-bezier(.16,1,.3,1) both}
+  body.chat-open #chat{animation:vtFadeIn 150ms ease-in-out both}
+  /* feuilles du bas (saisie de séance, RPE, fiche du jour) */
+  #modal.open{animation:bdIn 300ms ease-out both}
+  #modal.open .box{animation:sheetIn 300ms ease-out both}
+  #modal.closing{animation:bdOut 250ms ease-in both}
+  #modal.closing .box{animation:sheetOut 250ms ease-in both}
+  /* boutons : appui 0,95 en 100 ms, retour avec rebond */
+  button,.btn{transition:transform 260ms cubic-bezier(.175,.885,.32,1.275)}
+  button:active,.btn:active{transform:scale(.95);transition:transform 100ms ease-out}
+  .seg button{transition:background-color 200ms ease-out,color 200ms ease-out,transform 260ms cubic-bezier(.175,.885,.32,1.275)}
+  /* nouveaux messages du coach : apparition 300 ms */
+  .cm.fresh{animation:cmIn 300ms ease-out both}
+}
+/* barre d'onglets flottante : ombre légère + flou d'arrière-plan */
+@media (max-width:760px){
+  .tabbar{background:rgba(237,228,210,.82);-webkit-backdrop-filter:saturate(1.5) blur(14px);backdrop-filter:saturate(1.5) blur(14px);box-shadow:0 -6px 20px -6px rgba(31,36,34,.16)}
+  .tabbar button.on:before{display:none}
+  #tab-ind{position:absolute;top:-1px;left:0;width:20%;height:3px;pointer-events:none;transition:transform 200ms cubic-bezier(.16,1,.3,1),opacity 150ms}
+  #tab-ind:before{content:'';position:absolute;left:26%;right:26%;top:0;bottom:0;border-radius:0 0 3px 3px;background:var(--green)}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
+}
 </style>
 
 </head>
@@ -1018,17 +1066,17 @@ body.panel-open .tabbar{display:none!important}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '77-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '78-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=77-p7"></script>
-  <script src="bridge.js?b=77-p7"></script>
-  <script src="updater.js?b=77-p7"></script>
+  <script src="api.js?b=78-p7"></script>
+  <script src="bridge.js?b=78-p7"></script>
+  <script src="updater.js?b=78-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=77-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=78-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur
