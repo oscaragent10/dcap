@@ -1743,73 +1743,52 @@
       });
       fp(); fl(); return out.join('');
     }
-    // ---- défilement : fenêtre sur téléphone, liste sur ordinateur
-    function nearBottom(th) {
-      th = th || 140;
-      if (MOBILE.matches) return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - th;
-      return box.scrollHeight - box.scrollTop - box.clientHeight < th;
-    }
-    /** Espace sous le dernier message = hauteur réellement couverte par la saisie + onglets + zone sûre (mesurée). */
-    function layout() {
-      if (!C.isOpen) return;
-      var r = comp.getBoundingClientRect();
-      if (MOBILE.matches) {
-        var tb = $('.topbar'); if (tb) document.documentElement.style.setProperty('--tbh', tb.getBoundingClientRect().height + 'px');
-        var cover = Math.max(0, Math.round(window.innerHeight - r.top));
-        endEl.style.height = (cover + 18) + 'px'; pill.style.bottom = (cover + 12) + 'px';
-      } else { var cb = $('#chat').getBoundingClientRect(); pill.style.bottom = Math.round(cb.bottom - r.top + 12) + 'px'; }
-    }
+    // ---- v82 : défilement refait selon le motif « stick to bottom » (StackBlitz use-stick-to-bottom) :
+    // UN seul défileur (#chat-sc, jamais la fenêtre), UN ResizeObserver, recalage instantané scrollTop = scrollHeight
+    // seulement si l'on est « collé ». On ne se décolle que si le DOIGT / la molette remonte. Aucun timer, aucun smooth.
+    var sc = $('#chat-sc'), REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
+    function nearBottom(th) { return sc.scrollHeight - sc.scrollTop - sc.clientHeight < (th || 70); }
+    function stickNow() { if (C.isOpen && C.stick) sc.scrollTop = sc.scrollHeight; }
     function toEnd(smooth) {
-      if (!C.isOpen || userBusy()) return;
-      layout(); C.stick = true; C.unseen = false; setPill();
-      var doIt = function (sm) {
-        if (userBusy()) return; // Paul fait défiler : on ne le ramène pas en bas
-        if (MOBILE.matches) window.scrollTo({ top: document.documentElement.scrollHeight, behavior: sm ? 'smooth' : 'auto' });
-        else box.scrollTo({ top: box.scrollHeight, behavior: sm ? 'smooth' : 'auto' });
-      };
-      requestAnimationFrame(function () { requestAnimationFrame(function () { doIt(smooth); }); [smooth ? 450 : 120, 400, 900].forEach(function (t) { setTimeout(function () { if (C.stick || pinned()) doIt(false); }, t); }); });
+      if (!C.isOpen) return;
+      C.stick = true; C.unseen = false; setPill();
+      if (smooth && !(REDUCED && REDUCED.matches)) sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' }); else sc.scrollTop = sc.scrollHeight;
     }
+    function hardEnd() { stickNow(); }      // compat : anciens appels v77–v81, désormais un simple recalage
+    function pin() { C.stick = true; }
+    function pinned() { return false; }
+    function userBusy() { return C.touching || Date.now() - (C.userAt || 0) < 900; }
     function setPill() {
-      var show = C.isOpen && !C.stick && C.unseen; // v66 : seulement s'il y a un nouveau message plus bas
+      var show = C.isOpen && !C.stick && C.unseen;
       pill.hidden = !show; pill.classList.toggle('new', C.unseen);
       pill.textContent = C.unseen ? 'Nouveau message ↓' : 'Dernier message ↓';
     }
-    // v77 : recalage direct (scrollTop = scrollHeight) à chaque image pendant ms, + ResizeObserver du fil ; s'arrête dès que le doigt touche le fil
-    function hardEnd(ms) {
-      var t0 = performance.now(), se = function () { return MOBILE.matches ? (document.scrollingElement || document.documentElement) : box; };
-      var go = function () { if (!C.isOpen || userBusy() || !(C.stick || pinned())) return false; var el = se(); el.scrollTop = el.scrollHeight; return true; };
-      go();
-      (function loop(t) { if (go() !== false && t - t0 < ms) requestAnimationFrame(loop); })(t0);
-      if (window.ResizeObserver) { var ro = new ResizeObserver(function () { go(); }); ro.observe(box); setTimeout(function () { ro.disconnect(); }, ms); }
+    // hauteur visible réelle (clavier iOS compris) → variables CSS ; le Coach est un panneau fixe qui suit visualViewport
+    function layout() {
+      var vv = window.visualViewport, de = document.documentElement, tb = $('.topbar');
+      if (tb) de.style.setProperty('--tbh', tb.getBoundingClientRect().height + 'px');
+      de.style.setProperty('--vvh', (vv ? vv.height : window.innerHeight) + 'px');
+      de.style.setProperty('--vvt', (vv ? Math.max(0, vv.offsetTop) : 0) + 'px');
+      pill.style.bottom = (comp.offsetHeight + 12) + 'px';
     }
-    window.addEventListener('pageshow', function () { if (C.isOpen && C.stick) { pin(1500); hardEnd(1500); } });
-    function pinned() { return Date.now() < (C.pinUntil || 0); }
-    function pin(ms) { C.pinUntil = Date.now() + (ms || 3000); C.stick = true; }
-    // v73 : doigt posé / inertie → aucun recalage automatique (sinon le fil revient en bas et Paul ne peut pas remonter, surtout clavier ouvert)
-    function userBusy() { return C.touching || Date.now() - (C.userAt || 0) < 900; }
-    window.addEventListener('touchstart', function (e) { if (e.target.closest && e.target.closest('#composer,.tabbar,.topbar,#bubble,#new-pill,#modal')) return; /* v77 : seul un doigt sur le fil compte (pas l'appui sur l'onglet Coach) */ C.pinUntil = 0; C.touching = true; C.userAt = Date.now(); }, { passive: true });
-    window.addEventListener('touchmove', function () { if (C.touching) C.userAt = Date.now(); }, { passive: true });
-    ['touchend', 'touchcancel'].forEach(function (ev) { window.addEventListener(ev, function () { if (C.touching) { C.touching = false; C.userAt = Date.now(); } }, { passive: true }); });
-    window.addEventListener('wheel', function () { C.pinUntil = 0; C.userAt = Date.now(); }, { passive: true });
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (C.isOpen && C.stick) toEnd(false); });
-    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && C.isOpen && C.stick) { pin(1500); toEnd(false); hardEnd(1500); } });
-    function onScroll() { if (!C.isOpen || (pinned() && !userBusy())) return; var nb = userBusy() ? nearBottom(40) : nearBottom(); if (!nb && !userBusy()) return; /* v81 : un défilement programmé (smooth, clavier, contenu qui pousse) ne décolle jamais du bas ; seul le doigt / la molette le fait */ if (nb !== C.stick || (nb && C.unseen)) { C.stick = nb; if (nb) C.unseen = false; setPill(); } }
-    window.addEventListener('scroll', function () { if (MOBILE.matches) onScroll(); }, { passive: true });
-    box.addEventListener('scroll', function () { if (!MOBILE.matches) onScroll(); }, { passive: true });
-    window.addEventListener('resize', function () { var st = C.stick; layout(); if (st) toEnd(false); });
-    function setTbh() { var tb = $('.topbar'); if (tb) document.documentElement.style.setProperty('--tbh', tb.getBoundingClientRect().height + 'px'); }
-    setTbh();
-    if (window.ResizeObserver) {
-      new ResizeObserver(setTbh).observe($('.topbar'));
-      new ResizeObserver(function () { var st = C.stick; layout(); if (st && C.isOpen) toEnd(false); }).observe(comp);
-      // contenu qui grandit après coup (bandeau de contexte, polices, debriefs) : rester collé au dernier message
-      var ro = new ResizeObserver(function () { if (C.isOpen && C.stick && !userBusy()) { stickNow(); toEnd(false); } }); ro.observe(box); ro.observe($('#chat .ch')); ro.observe(endEl);
-    }
+    var lastTop = 0;
+    sc.addEventListener('scroll', function () {
+      var t = sc.scrollTop, up = t < lastTop - 1; lastTop = t;
+      if (nearBottom()) { if (!C.stick || C.unseen) { C.stick = true; C.unseen = false; setPill(); } }
+      else if (up && userBusy() && C.stick) { C.stick = false; setPill(); } // décroché seulement par Paul
+    }, { passive: true });
+    sc.addEventListener('touchstart', function () { C.touching = true; C.userAt = Date.now(); }, { passive: true });
+    sc.addEventListener('touchmove', function () { C.userAt = Date.now(); }, { passive: true });
+    ['touchend', 'touchcancel'].forEach(function (ev) { sc.addEventListener(ev, function () { C.touching = false; C.userAt = Date.now(); }, { passive: true }); });
+    sc.addEventListener('wheel', function () { C.userAt = Date.now(); }, { passive: true });
+    if (window.ResizeObserver) { var ro = new ResizeObserver(function () { stickNow(); }); ro.observe(box); ro.observe(sc); }
+    box.addEventListener('load', stickNow, true); // images chargées après coup
+    var lq = 0; function relayout() { if (lq) return; lq = requestAnimationFrame(function () { lq = 0; layout(); stickNow(); }); }
+    if (window.visualViewport) { visualViewport.addEventListener('resize', relayout); visualViewport.addEventListener('scroll', relayout); }
+    window.addEventListener('resize', relayout);
+    if (window.ResizeObserver) { var rl = new ResizeObserver(relayout); rl.observe($('.topbar')); rl.observe(comp); }
+    layout();
     pill.onclick = function () { toEnd(true); };
-    /** v81 : recalage immédiat et synchrone (sans animation) — appelé après chaque rendu et à chaque changement de taille. */
-    function stickNow() { if (!C.isOpen || userBusy() || !(C.stick || pinned())) return; layout(); var el = MOBILE.matches ? (document.scrollingElement || document.documentElement) : box; el.scrollTop = el.scrollHeight; }
-    box.addEventListener('load', function () { if (C.stick) stickNow(); }, true); // images chargées après coup
-    if (window.visualViewport) visualViewport.addEventListener('scroll', function () { if (C.isOpen && C.stick && document.body.classList.contains('kb')) stickNow(); });
 
     // ---- données
     function apply(r) {
@@ -2128,22 +2107,9 @@
     // pour que les messages ne sautent pas ; dernier message ramené en vue si on était en bas ; visualViewport suit le clavier iOS.
     // v66 : pendant la saisie, rien d'autre de focalisable hors du Coach (barre ⌃ ⌄ d'iOS : flèches désactivées)
     function kbInert(on) { ['#view', '.topbar', '.tabbar'].forEach(function (s) { var e = $(s); if (e) { if (on) e.setAttribute('inert', ''); else e.removeAttribute('inert'); } }); }
-    function headH() { var t = $('.topbar'), h = $('#chat .ch'); return (t ? t.offsetHeight : 0) + (h ? h.offsetHeight : 0); }
-    input.addEventListener('focus', function () {
-      var st = C.stick || nearBottom();
-      if (MOBILE.matches && !document.body.classList.contains('kb')) { var h = headH(); document.body.classList.add('kb'); kbInert(true); C.kbDh = h - headH(); if (!st && C.kbDh) window.scrollBy(0, -C.kbDh); }
-      layout(); if (st) { toEnd(); setTimeout(function () { toEnd(); }, 350); }
-    });
-    input.addEventListener('blur', function () {
-      var st = C.stick, was = document.body.classList.contains('kb');
-      document.body.classList.remove('kb'); kbInert(false); if (was && !st && MOBILE.matches && C.kbDh) window.scrollBy(0, C.kbDh);
-      layout(); if (st) setTimeout(function () { toEnd(); }, 60);
-    });
-    if (window.visualViewport) visualViewport.addEventListener('resize', function () {
-      if (!C.isOpen) return;
-      if (!document.body.classList.contains('kb')) { if (C.stick) { layout(); stickNow(); } return; }
-      layout(); if (userBusy()) return; if (C.stick) toEnd(); input.scrollIntoView && document.activeElement === input && input.scrollIntoView({ block: 'nearest' });
-    });
+    // v82 : clavier = simple classe CSS ; le panneau suit visualViewport (relayout), le ResizeObserver garde le bas si on y était
+    input.addEventListener('focus', function () { if (MOBILE.matches) { document.body.classList.add('kb'); kbInert(true); } relayout(); });
+    input.addEventListener('blur', function () { document.body.classList.remove('kb'); kbInert(false); relayout(); });
     // Dictée : bouton micro → la page enveloppe (oscaragent10.github.io) lance la reconnaissance vocale fr-FR
     var mic = { on: false, base: '', busy: false };
     function micStatus(h) { var el = $('#mic-status'); if (!el) { el = document.createElement('div'); el.id = 'mic-status'; el.setAttribute('aria-live', 'polite'); $('#chat-form').parentNode.insertBefore(el, $('#chat-form')); } el.innerHTML = h; el.hidden = !h; }

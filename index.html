@@ -316,7 +316,8 @@ h1,h2,h3{font-family:var(--head);font-weight:800;text-transform:uppercase;letter
 .cs span{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
 .cs.race{border-left:3px solid var(--gold)} .cs.race.A b{color:var(--gold-d)}
 .cs .bar{display:block;align-self:stretch;height:3px;background:var(--line-2);border-radius:2px;overflow:hidden} .cs .bar i{display:block;height:100%;background:var(--green)}
-#chat .msgs{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px;display:flex;flex-direction:column;gap:10px}
+#chat-sc{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;overflow-anchor:none}
+#chat .msgs{padding:12px;display:flex;flex-direction:column;gap:10px}
 #chat-end{display:none}
 .dsep{display:flex;align-items:center;gap:10px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:6px 0 0}
 .dsep:before,.dsep:after{content:'';flex:1;height:1px;background:var(--line)}
@@ -673,19 +674,22 @@ h1,h2,h3{font-family:var(--head);font-weight:800;text-transform:uppercase;letter
   /* coach (téléphone) : une PAGE comme les autres, dans le flux sous l'en-tête DCAP (défilement de la fenêtre, pas de
      défileur imbriqué). En-tête + bandeau collants sous la barre DCAP ; saisie fixe au-dessus des onglets (contre le
      clavier pendant la saisie). L'espace sous le dernier message (#chat-end) est MESURÉ en JS = tout ce qui couvre le bas. */
-  #chat,#chat.open{position:static;inset:auto;width:auto;max-width:none;height:auto;max-height:none;border-radius:0;border:0;box-shadow:none;background:transparent;overflow:visible;z-index:auto}
-  #chat.open{display:block}
+  /* v82 : le Coach (téléphone) est un PANNEAU FIXE qui épouse la zone visible (visualViewport → --vvt/--vvh) :
+     en-tête, fil (#chat-sc, seul défileur) puis saisie, dans le flux. La page derrière ne défile plus. */
+  html:has(body.chat-open),body.chat-open{overflow:hidden;overscroll-behavior:none}
+  #chat,#chat.open{position:fixed;left:0;right:0;top:calc(var(--vvt,0px) + var(--tbh,57px));height:calc(var(--vvh,100dvh) - var(--tbh,57px) - 59px - max(env(safe-area-inset-bottom),var(--sab,0px)));width:auto;max-width:none;max-height:none;border-radius:0;border:0;box-shadow:none;background:var(--parchment);overflow:hidden;z-index:1040;bottom:auto}
+  #chat.open{display:flex;flex-direction:column}
+  body.kb.chat-open #chat{height:calc(var(--vvh,100dvh) - var(--tbh,57px))}
+  body.kb.chat-open .topbar{position:fixed;left:0;right:0;top:var(--vvt,0px)}
   body.chat-open #view{display:none}
-  #chat .ch{position:sticky;top:var(--tbh,57px);z-index:900;background:var(--parchment);padding:9px max(12px,env(safe-area-inset-right)) 9px max(12px,env(safe-area-inset-left));box-shadow:0 6px 10px -8px rgba(31,36,34,.25)}
+  #chat .ch{flex:none;z-index:900;background:var(--parchment);padding:9px max(12px,env(safe-area-inset-right)) 9px max(12px,env(safe-area-inset-left));box-shadow:0 6px 10px -8px rgba(31,36,34,.25)}
   .cstrip{margin:9px calc(-1 * max(12px,env(safe-area-inset-right))) 0 calc(-1 * max(12px,env(safe-area-inset-left)));padding:0 max(12px,env(safe-area-inset-right)) 3px max(12px,env(safe-area-inset-left))}
   #chat-close{display:none} /* on quitte le coach par la barre d'onglets */
-  #chat .msgs{overflow:visible;padding:12px max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left));gap:12px}
-  #chat-end{display:block;height:180px}
-  #composer{position:fixed;left:0;right:0;bottom:calc(59px + max(env(safe-area-inset-bottom),var(--sab)));z-index:1045;padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left);box-shadow:0 -6px 12px -10px rgba(31,36,34,.3)}
-  #new-pill{position:fixed}
+  #chat .msgs{padding:12px max(12px,env(safe-area-inset-right)) 14px max(12px,env(safe-area-inset-left));gap:12px}
+  #chat-end{display:none}
+  #composer{flex:none;position:relative;z-index:1045;padding:0 env(safe-area-inset-right) 0 env(safe-area-inset-left);box-shadow:0 -6px 12px -10px rgba(31,36,34,.3)}
   /* clavier ouvert : onglets masqués, la saisie descend contre le clavier */
   body.kb.chat-open .tabbar{display:none}
-  body.kb #composer{bottom:0}
   body.kb .cstrip{display:none}
   body.chat-open #toast{bottom:calc(170px + max(env(safe-area-inset-bottom),var(--sab)))}
   body.kb.chat-open #toast{bottom:120px}
@@ -1069,7 +1073,7 @@ body.panel-open .tabbar{display:none!important}
         <button class="btn btn-ghost btn-sm" id="chat-close" aria-label="Fermer le coach">Fermer ✕</button>
       </div>
     </div>
-    <div class="msgs" id="msgs" aria-live="polite"></div>
+    <div id="chat-sc"><div class="msgs" id="msgs" aria-live="polite"></div></div>
     <div id="chat-end" aria-hidden="true"></div>
     <button id="new-pill" type="button" hidden>Nouveau message ↓</button>
     <div id="composer">
@@ -1091,17 +1095,17 @@ body.panel-open .tabbar{display:none!important}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '81-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '82-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=81-p7"></script>
-  <script src="bridge.js?b=81-p7"></script>
-  <script src="updater.js?b=81-p7"></script>
+  <script src="api.js?b=82-p7"></script>
+  <script src="bridge.js?b=82-p7"></script>
+  <script src="updater.js?b=82-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=81-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=82-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur
