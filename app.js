@@ -1793,7 +1793,7 @@
     window.addEventListener('wheel', function () { C.pinUntil = 0; C.userAt = Date.now(); }, { passive: true });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (C.isOpen && C.stick) toEnd(false); });
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && C.isOpen && C.stick) { pin(1500); toEnd(false); hardEnd(1500); } });
-    function onScroll() { if (!C.isOpen || (pinned() && !userBusy())) return; var nb = userBusy() ? nearBottom(40) : nearBottom(); if (nb !== C.stick || (nb && C.unseen)) { C.stick = nb; if (nb) C.unseen = false; setPill(); } }
+    function onScroll() { if (!C.isOpen || (pinned() && !userBusy())) return; var nb = userBusy() ? nearBottom(40) : nearBottom(); if (!nb && !userBusy()) return; /* v81 : un défilement programmé (smooth, clavier, contenu qui pousse) ne décolle jamais du bas ; seul le doigt / la molette le fait */ if (nb !== C.stick || (nb && C.unseen)) { C.stick = nb; if (nb) C.unseen = false; setPill(); } }
     window.addEventListener('scroll', function () { if (MOBILE.matches) onScroll(); }, { passive: true });
     box.addEventListener('scroll', function () { if (!MOBILE.matches) onScroll(); }, { passive: true });
     window.addEventListener('resize', function () { var st = C.stick; layout(); if (st) toEnd(false); });
@@ -1803,9 +1803,13 @@
       new ResizeObserver(setTbh).observe($('.topbar'));
       new ResizeObserver(function () { var st = C.stick; layout(); if (st && C.isOpen) toEnd(false); }).observe(comp);
       // contenu qui grandit après coup (bandeau de contexte, polices, debriefs) : rester collé au dernier message
-      var ro = new ResizeObserver(function () { if (C.isOpen && C.stick) toEnd(false); }); ro.observe(box); ro.observe($('#chat .ch'));
+      var ro = new ResizeObserver(function () { if (C.isOpen && C.stick && !userBusy()) { stickNow(); toEnd(false); } }); ro.observe(box); ro.observe($('#chat .ch')); ro.observe(endEl);
     }
     pill.onclick = function () { toEnd(true); };
+    /** v81 : recalage immédiat et synchrone (sans animation) — appelé après chaque rendu et à chaque changement de taille. */
+    function stickNow() { if (!C.isOpen || userBusy() || !(C.stick || pinned())) return; layout(); var el = MOBILE.matches ? (document.scrollingElement || document.documentElement) : box; el.scrollTop = el.scrollHeight; }
+    box.addEventListener('load', function () { if (C.stick) stickNow(); }, true); // images chargées après coup
+    if (window.visualViewport) visualViewport.addEventListener('scroll', function () { if (C.isOpen && C.stick && document.body.classList.contains('kb')) stickNow(); });
 
     // ---- données
     function apply(r) {
@@ -1946,8 +1950,8 @@
       var t = m.ts ? String(m.ts).slice(11, 16) : '';
       if (m.role === 'user') {
         var mm = String(m.text).match(/^([\s\S]*?)\n\n\[contexte : ([\s\S]*)\]$/), body = mm ? mm[1] : m.text;
-        var st = m.status === 'error' ? 'erreur' : m.queued ? 'en attente de réseau' : m.status === 'pending' ? 'envoyé' : 'lu ✓';
-        return '<div class="cm me"><div class="me-b">' + esc(body) + '</div>' + (mm ? '<div class="me-ctx">↳ ' + esc(mm[2]) + '</div>' : '') + '<div class="me-meta">' + t + ' · ' + st + '</div></div>';
+        var st = m.status === 'error' ? 'erreur' : m.status === 'pending' ? (m.queued ? 'en attente réseau' : 'envoyé') : 'lu ✓';
+        return '<div class="cm me"><div class="me-b">' + esc(body) + (m.reaction ? '<span class="me-react" title="Réaction du coach">' + esc(m.reaction) + '</span>' : '') + '</div>' + (mm ? '<div class="me-ctx">↳ ' + esc(mm[2]) + '</div>' : '') + '<div class="me-meta">' + t + ' · ' + st + '</div></div>';
       }
       if (m.role === 'system') return '<div class="cm sys' + (/erreur/i.test(m.text) ? ' err' : '') + '">' + esc(m.text) + '</div>';
       var p = m.proposal_id && C.props[m.proposal_id], ac = m.action_id && C.acts[m.action_id];
@@ -2029,7 +2033,7 @@
       if (sig === C.sig && !forceEnd) { if (pinned()) toEnd(false); return; }
       var stick = C.stick || nearBottom() || pinned();
       C.sig = sig; patch(list);
-      if (forceEnd || first || stick) toEnd(!first);
+      if (forceEnd || first || stick) { if (forceEnd) C.stick = true; stickNow(); toEnd(false); hardEnd(first ? 1200 : 600); } // v81 : plus de smooth (il décollait du bas)
       else if (newCoach) { C.unseen = true; setPill(); }
       C.just = null;
     }
@@ -2087,7 +2091,7 @@
       var r0 = ref !== undefined && ref !== null ? ref : C.ctx;
       C.msgs.push({ role: 'user', text: text + (r0 ? '\n\n[contexte : ' + r0 + ']' : ''), ts: etNow(), status: 'pending', queued: !navigator.onLine });
       setCtx(null); render(true); schedule();
-      call('uiSendChat', text, r0 || null).then(function (r) { C.sending = false; apply(r); if (r.queued) toast('Hors ligne : message gardé, envoyé dès le retour du réseau', 4500); if (r.error) toast('Erreur xAI : ' + r.error, 6000); if (r.reply && r.reply.proposal) toast('Nouvelle proposition à valider'); })
+      call('uiSendChat', text, r0 || null).then(function (r) { C.sending = false; try { if (localStorage.getItem('dcap-chat-draft') === text && !input.value.trim()) localStorage.removeItem('dcap-chat-draft'); } catch (err) {} apply(r); if (r.queued) toast('Hors ligne : message gardé, envoyé dès le retour du réseau', 4500); if (r.error) toast('Erreur xAI : ' + r.error, 6000); if (r.reply && r.reply.proposal) toast('Nouvelle proposition à valider'); })
         .catch(function (e) { C.sending = false; C.msgs.pop(); render(); input.value = input.value || text; input.dispatchEvent(new Event('input')); fail(e); });
     }
     function setCtx(c) { C.ctx = c; $('#ctx-chip').style.display = c ? 'flex' : 'none'; $('#ctx-text').textContent = c ? 'À propos de : ' + c : ''; }
@@ -2114,7 +2118,7 @@
     function setNew(on) { $('#bubble').classList.toggle('has-new', on); $('#tab-coach').classList.toggle('has-new', on); }
     $('#bubble').onclick = function () { C.isOpen ? close() : open(); };
     // onglet Coach (téléphone) : ouvre la page coach ; déjà ouverte → retour au dernier message
-    $('#tab-coach').onclick = function () { if (!C.isOpen) open(); else toEnd(true); };
+    $('#tab-coach').onclick = function () { if (!C.isOpen) open(); else { pin(1500); toEnd(false); hardEnd(800); } };
     document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); }); // retour dans l'app : nouveaux messages du coach (pastille)
     // zone de saisie : grandit avec le texte (max ~5 lignes) ; suggestions masquées dès qu'on écrit
     input.addEventListener('input', function () { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight + 2, 132) + 'px'; $('#sugg').classList.toggle('off', !!this.value.trim() || waiting()); });
@@ -2136,7 +2140,8 @@
       layout(); if (st) setTimeout(function () { toEnd(); }, 60);
     });
     if (window.visualViewport) visualViewport.addEventListener('resize', function () {
-      if (!C.isOpen || !document.body.classList.contains('kb')) return;
+      if (!C.isOpen) return;
+      if (!document.body.classList.contains('kb')) { if (C.stick) { layout(); stickNow(); } return; }
       layout(); if (userBusy()) return; if (C.stick) toEnd(); input.scrollIntoView && document.activeElement === input && input.scrollIntoView({ block: 'nearest' });
     });
     // Dictée : bouton micro → la page enveloppe (oscaragent10.github.io) lance la reconnaissance vocale fr-FR
@@ -2164,13 +2169,24 @@
       else if (m.type === 'open-coach') { if (!C.isOpen) open(); else { load(); toEnd(true); } } // toucher une notification
     });
     $('#ctx-clear').onclick = function (e) { e.preventDefault(); setCtx(null); };
-    $('#chat-send').addEventListener('click', function (e) { $('#chat-form').onsubmit(e); });
-    $('#chat-form').onsubmit = function (e) {
-      e.preventDefault(); var t = input.value.trim(); if (!t || C.sending) return;
+    // v81 : envoi sur pointerdown (+ preventDefault) : le champ garde le focus, le clavier reste ouvert et le blur n'avale plus le tap.
+    // Anti double envoi : C.sending + même texte ignoré pendant 1,5 s. Brouillon gardé en localStorage jusqu'à confirmation (serveur ou file hors ligne).
+    var sendBtn = $('#chat-send'), DKEY = 'dcap-chat-draft', lastSend = { t: '', at: 0 };
+    function trySend(e) {
+      if (e) { e.preventDefault(); if (e.stopPropagation) e.stopPropagation(); }
+      var t = input.value.trim(); if (!t || C.sending) return;
+      if (t === lastSend.t && Date.now() - lastSend.at < 1500) return;
+      lastSend = { t: t, at: Date.now() };
       if (mic.on) { Wrapper.send({ type: 'mic-stop' }); micUi(false); }
+      try { localStorage.setItem(DKEY, t); } catch (err) {}
       input.value = ''; input.dispatchEvent(new Event('input')); send(t);
-    };
-    input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('#chat-form').onsubmit(e); } });
+    }
+    sendBtn.addEventListener(window.PointerEvent ? 'pointerdown' : 'touchstart', function (e) { if (e.button > 0) return; sendBtn._pd = Date.now(); trySend(e); }, { passive: false });
+    sendBtn.addEventListener('mousedown', function (e) { e.preventDefault(); }); // garde le focus du champ
+    sendBtn.addEventListener('click', function (e) { e.preventDefault(); if (Date.now() - (sendBtn._pd || 0) < 800) return; trySend(e); }); // clavier / lecteur d'écran
+    $('#chat-form').onsubmit = trySend;
+    try { var dr = localStorage.getItem(DKEY); if (dr && !input.value) { input.value = dr; setTimeout(function () { input.dispatchEvent(new Event('input')); }, 0); } } catch (err) {}
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); trySend(e); } });
     return { open: open, close: close, load: load };
   })();
 

@@ -341,6 +341,7 @@ h1,h2,h3{font-family:var(--head);font-weight:800;text-transform:uppercase;letter
 .cm.me{align-self:flex-end;max-width:84%;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .me-b{background:var(--ink);color:#F6F1E6;padding:8px 11px;border-radius:13px 13px 3px 13px;font-size:11.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;-webkit-user-select:text;user-select:text}
 .me-ctx{font-size:10.5px;color:var(--ink-2);background:#FFF7E6;border:1px solid var(--gold);border-radius:5px;padding:2px 7px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me-b{position:relative}.me-react{position:absolute;right:-6px;bottom:-12px;font-size:13px;line-height:1;background:var(--card,#fff);border:1px solid var(--line,#e5e5e5);border-radius:999px;padding:3px 5px;box-shadow:0 1px 3px rgba(0,0,0,.12);animation:reactIn .3s cubic-bezier(0.16,1,0.3,1)}@keyframes reactIn{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}@media (prefers-reduced-motion:reduce){.me-react{animation:none}}.cm.me:has(.me-react) .me-meta{margin-top:10px}
 .me-meta{font-size:10px;letter-spacing:.06em;color:var(--muted)}
 .cm.sys{align-self:center;font-size:11px;color:var(--muted);text-align:center;padding:2px 10px;max-width:90%}
 .cm.sys.err{color:var(--danger)}
@@ -1090,17 +1091,17 @@ body.panel-open .tabbar{display:none!important}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '80-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '81-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=80-p7"></script>
-  <script src="bridge.js?b=80-p7"></script>
-  <script src="updater.js?b=80-p7"></script>
+  <script src="api.js?b=81-p7"></script>
+  <script src="bridge.js?b=81-p7"></script>
+  <script src="updater.js?b=81-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=80-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=81-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur
