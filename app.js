@@ -2229,6 +2229,19 @@
   // v85 : la semaine en cours se calcule d'après la date de New York, pas d'après le cache BOOT (qui peut dater de la veille / de la semaine dernière)
   S.today = etYmd(); S.curMonday = mondayOf(S.today); S.weekDay = null;
   if (window.BOOT && window.BOOT.monday && window.BOOT.today === S.today) WK[window.BOOT.monday] = { data: window.BOOT, at: Date.now() };
+  /** v86 : note de séance — le clavier se ferme dès qu'on fait défiler la page (geste du doigt > 14 px) ; le texte reste dans le champ (brouillon intact, rien n'est envoyé). Le glissement qui démarre dans le champ lui-même, et les 700 ms après l'ouverture du clavier, sont ignorés. Chat du coach et autres champs : inchangés. */
+  (function () {
+    var y0 = null, x0 = 0, inTa = false, focusAt = 0;
+    document.addEventListener('focusin', function (e) { if (e.target && e.target.id === 'gym-note') focusAt = Date.now(); }, true);
+    document.addEventListener('touchstart', function (e) { var t = e.touches && e.touches[0]; if (!t) return; y0 = t.clientY; x0 = t.clientX; var ae = document.activeElement; inTa = !!(e.target && e.target.closest && e.target.closest('#gym-note')); }, { passive: true, capture: true });
+    document.addEventListener('touchmove', function (e) {
+      var ae = document.activeElement; if (y0 === null || !ae || ae.id !== 'gym-note' || inTa) return;
+      if (Date.now() - focusAt < 700) return;
+      var t = e.touches && e.touches[0]; if (!t) return;
+      if (Math.abs(t.clientY - y0) > 14 && Math.abs(t.clientY - y0) > Math.abs(t.clientX - x0)) { y0 = null; ae.blur(); }
+    }, { passive: true, capture: true });
+    document.addEventListener('touchend', function () { y0 = null; }, { passive: true, capture: true });
+  })();
   /** v85 : nouveau jour (minuit à New York) pendant que l'app est ouverte ou en arrière-plan → semaine / mois en cours, sans toucher aux autres écrans */
   function dayRoll() {
     var T = etYmd(); if (T === S.today) return;
