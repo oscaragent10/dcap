@@ -27,6 +27,11 @@
   function ymdDate(s) { var p = s.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); }
   function addDays(s, k) { var d = ymdDate(s); d.setUTCDate(d.getUTCDate() + k); return d.toISOString().slice(0, 10); }
   function dowIdx(s) { var d = ymdDate(s).getUTCDay(); return d === 0 ? 6 : d - 1; }
+  // v85 : « aujourd'hui » = TOUJOURS la date de New York (jamais le fuseau de l'appareil ni UTC) ; DST géré par Intl
+  function etYmd() {
+    try { var p = {}; new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).forEach(function (x) { p[x.type] = x.value; }); return p.year + '-' + p.month + '-' + p.day; }
+    catch (e) { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  }
   function dm(s) { return s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '–'; }
   function dayLabel(s) { return DOW[dowIdx(s)] + ' ' + dm(s); }
   function toast(msg, ms) { var t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(function () { t.style.display = 'none'; }, ms || 3500); }
@@ -112,7 +117,7 @@
   /** v52 : écran ouvert mémorisé ; si iOS recharge l'app, on revient au même endroit (séance muscu comprise). */
   var NAV_KEY = 'dcap-nav1', NAV_TTL = 12 * 3600 * 1000;
   function navSave(view, opts) {
-    var o = { view: view, at: Date.now() };
+    var o = { view: view, at: Date.now(), d: etYmd() };
     if (view === 'week') o.day = S.weekDay || null;
     if (view === 'month') o.ym = S.ym || null;
     if (view === 'race') o.name = S.race || opts.name || null;
@@ -123,8 +128,10 @@
   function navRestore() {
     var o = null; try { o = JSON.parse(localStorage.getItem(NAV_KEY) || 'null'); } catch (e) {}
     if (!o || Date.now() - o.at > NAV_TTL) return go('week');
-    if (o.view === 'month' && o.ym) S.ym = o.ym;
-    if (o.view === 'week') return go('week', { day: o.day || null });
+    // v85 : à l'ouverture on revient sur la semaine / le mois EN COURS ; le jour ou le mois mémorisé n'est gardé que s'il est dans la semaine / le jour d'aujourd'hui (New York)
+    var T = etYmd(), keepDay = o.day && mondayOf(o.day) === mondayOf(T) ? o.day : null;
+    if (o.view === 'month' && o.ym && o.d === T) S.ym = o.ym;
+    if (o.view === 'week') return go('week', { day: keepDay });
     if (o.view === 'detail') return o.id ? go('detail', { id: o.id }) : go('week');
     if (o.view === 'gym') return (o.plan_id || o.date) ? go('gym', { plan_id: o.plan_id, date: o.date }) : go('week');
     if (['month', 'graph', 'perf', 'race'].indexOf(o.view) >= 0) return go(o.view, o.name ? { name: o.name } : {});
@@ -161,7 +168,7 @@
   }
   var WK = mkStore('wk'), MO = mkStore('mo'), STALE_MS = 120000;
   function mondayOf(s) { return addDays(s, -dowIdx(s)); }
-  function todayLocal() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function todayLocal() { return etYmd(); }
   function fetchCached(store, key, fn, args) {
     var e = store[key];
     if (e && e.data) return Promise.resolve(e.data);
@@ -2219,8 +2226,19 @@
   // rotation / redimensionnement à travers le seuil mobile : re-rendu (graphique, libellés compacts, carte)
   if (MOBILE.addEventListener) MOBILE.addEventListener('change', function () { if (!$('#chat').classList.contains('open')) refresh(); });
   // Démarrage : semaine en cours embarquée par doGet (window.BOOT) → rendu immédiat, sans aller-retour serveur.
-  S.today = window.BOOT && window.BOOT.today || null;
-  if (window.BOOT && window.BOOT.monday) { WK[window.BOOT.monday] = { data: window.BOOT, at: Date.now() }; S.curMonday = window.BOOT.monday; }
+  // v85 : la semaine en cours se calcule d'après la date de New York, pas d'après le cache BOOT (qui peut dater de la veille / de la semaine dernière)
+  S.today = etYmd(); S.curMonday = mondayOf(S.today); S.weekDay = null;
+  if (window.BOOT && window.BOOT.monday && window.BOOT.today === S.today) WK[window.BOOT.monday] = { data: window.BOOT, at: Date.now() };
+  /** v85 : nouveau jour (minuit à New York) pendant que l'app est ouverte ou en arrière-plan → semaine / mois en cours, sans toucher aux autres écrans */
+  function dayRoll() {
+    var T = etYmd(); if (T === S.today) return;
+    S.today = T; S.curMonday = mondayOf(T); S.weekDay = null; S.ym = null; S.preloaded = false; invalidateAll();
+    if (S.view === 'week' || S.view === 'month') { if ($('#modal').classList.contains('open')) return; go(S.view, S.view === 'week' ? { day: null } : {}); }
+    setTimeout(preloadAll, 3000);
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') dayRoll(); });
+  window.addEventListener('pageshow', dayRoll); window.addEventListener('focus', dayRoll);
+  setInterval(dayRoll, 60000);
   /** v58 : version servie ≠ version affichée → purge des caches de vues puis rechargement par l'enveloppe (une seule tentative par build). */
   var VER_LAST = 0;
   function checkVersion() {
