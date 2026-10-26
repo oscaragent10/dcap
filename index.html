@@ -1021,54 +1021,13 @@ body.panel-open .tabbar{display:none!important}
 .seg.has-pill button{position:relative}
 @media (prefers-reduced-motion: reduce){.mcal-card .mt-ghost,.mcal.mt-in,.mt-o,.mt-n{animation:none!important}.mt-o{display:none}.seg .seg-pill{transition:none!important}}
 
-/* ---------- v83 : taille du chat + mode page (Coach uniquement) ---------- */
-.ch-tools{display:flex;align-items:center;gap:4px;margin-left:auto;flex:none}
-#chat .ct{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:38px;height:38px;padding:0 8px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font:700 15px/1 var(--head,inherit);cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-#chat .ct small{font:700 11px/1 var(--mono);margin-left:1px}
-#chat .ct:active{transform:translateY(1px)} #chat .ct:disabled{opacity:.38}
-#chat .ct svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-#chat .ct .ct-t{font:600 11px/1 var(--mono);letter-spacing:.04em}
-#chat .ct-full .i-red{display:none} body.chat-full #chat .ct-full .i-red{display:block} body.chat-full #chat .ct-full .i-exp{display:none}
-#chat .ct-full[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#F6F1E6}
+/* ---------- v84 : taille de la fenêtre du Coach (grand écran / iPad) : poignée en haut à gauche ; rien sur iPhone (panneau plein écran) ---------- */
 #chat-grip{display:none}
-/* taille du texte (A−/A+) : --cz posée sur #chat (0,85 → 1,75) */
-#chat .cmd,#chat .me-b{font-size:calc(11.5px*var(--cz,1))}
-#chat .cmd h4,#chat .dbc-t,#chat .th-t{font-size:calc(15px*var(--cz,1))} #chat .cmd h4{font-size:calc(14.5px*var(--cz,1))}
-#chat .pc-ops li,#chat .pc-why,#chat .ac-s,#chat .ac-steps li{font-size:calc(12px*var(--cz,1))}
-#chat .qb{font-size:calc(12.5px*var(--cz,1))} #chat .qg-q,#chat .ac-x{font-size:calc(11.5px*var(--cz,1))}
-#chat .me-meta,#chat .cm header{font-size:calc(10px*var(--cz,1))}
-#chat .cm.sys{font-size:calc(11px*var(--cz,1))}
-#chat textarea{font-size:calc(12.5px*var(--cz,1))}
 @media (min-width:761px){
   #chat-grip{display:block;position:absolute;left:0;top:0;width:30px;height:30px;z-index:1300;cursor:nwse-resize;touch-action:none;-webkit-user-select:none;user-select:none}
   #chat-grip:before{content:'';position:absolute;left:6px;top:6px;width:11px;height:11px;border-left:2px solid var(--muted);border-top:2px solid var(--muted);border-radius:3px 0 0 0;opacity:.7}
   #chat-grip:hover:before{border-color:var(--green-d);opacity:1}
   body.chat-resizing{cursor:nwse-resize;-webkit-user-select:none;user-select:none}
-  body.chat-resizing #chat{transition:none}
-  #chat .ct .ct-t{display:none}
-  /* mode page (grand écran) : le Coach couvre toute la fenêtre, contenu centré */
-  body.chat-full #chat.open{top:0;left:0;right:0;bottom:0;width:auto;height:auto;max-width:none;max-height:none;border:0;border-radius:0;box-shadow:none;z-index:1300}
-  body.chat-full #chat-grip,body.chat-full #bubble{display:none}
-  body.chat-full #chat .ch{padding-left:max(18px,calc((100% - 860px)/2));padding-right:max(18px,calc((100% - 860px)/2))}
-  body.chat-full #chat .msgs{width:100%;max-width:860px;margin:0 auto;box-sizing:border-box;padding:18px}
-  body.chat-full #composer>*{max-width:860px;margin-left:auto;margin-right:auto;box-sizing:border-box}
-  body.chat-full #chat .ct .ct-t{display:inline}
-  body.chat-full #chat-close{display:none}
-}
-@media (max-width:760px){
-  #chat .cmd,#chat .me-b{font-size:calc(12px*var(--cz,1))}
-  #chat textarea{font-size:max(16px,calc(16px*var(--cz,1)));line-height:1.3;height:auto;min-height:36px}
-  #chat .ct{min-width:40px;height:40px}
-  /* mode page (iPhone) : plein écran, sans barre du haut ni onglets ; suit la zone visible (clavier compris) */
-  body.chat-full.chat-open #chat.open{top:var(--vvt,0px);height:var(--vvh,100dvh);z-index:1300}
-  body.chat-full.chat-open .topbar,body.chat-full.chat-open .tabbar{visibility:hidden}
-  body.chat-full.chat-open #chat .ch,body.chat-full.chat-open.kb #chat .ch{display:block!important;padding-top:max(env(safe-area-inset-top),var(--sat,0px));box-shadow:0 6px 10px -8px rgba(31,36,34,.25)}
-  body.chat-full.chat-open #chat .ch .ch-top{padding-top:6px;padding-bottom:0}
-  body.chat-full.chat-open.kb #chat-mode{display:none}
-  body.chat-full.chat-open #composer{padding-bottom:max(env(safe-area-inset-bottom),var(--sab,0px))}
-  body.chat-full.chat-open.kb #composer{padding-bottom:0}
-  body.chat-full.chat-open #toast{bottom:calc(90px + max(env(safe-area-inset-bottom),var(--sab,0px)))}
-  body.chat-full.chat-open.kb #toast{bottom:90px}
 }
 </style>
 
@@ -1121,11 +1080,6 @@ body.panel-open .tabbar{display:none!important}
       <div class="ch-top">
         <div class="ch-id"><span class="ch-mark" id="ch-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 18.5l5.2-8 3.6 4.6 3-4.2 6.2 7.6z"/><path d="M14.8 5.5l1.2 2.3"/><circle cx="17" cy="5" r="1.2"/></svg></span>
           <div><h3>Coach</h3><span class="mono-label" id="chat-mode"></span></div></div>
-        <div class="ch-tools" role="group" aria-label="Taille du chat">
-          <button type="button" class="ct" id="chat-zm" aria-label="Texte plus petit" title="Texte plus petit">A<small>−</small></button>
-          <button type="button" class="ct" id="chat-zp" aria-label="Texte plus grand" title="Texte plus grand">A<small>+</small></button>
-          <button type="button" class="ct ct-full" id="chat-full" aria-label="Agrandir le coach en mode page" aria-pressed="false" title="Agrandir (mode page)"><svg class="i-exp" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg><svg class="i-red" viewBox="0 0 24 24"><path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7"/></svg><span class="ct-t">Agrandir</span></button>
-        </div>
         <button class="btn btn-ghost btn-sm" id="chat-close" aria-label="Fermer le coach">Fermer ✕</button>
       </div>
     </div>
@@ -1151,17 +1105,17 @@ body.panel-open .tabbar{display:none!important}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '83-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '84-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=83-p7"></script>
-  <script src="bridge.js?b=83-p7"></script>
-  <script src="updater.js?b=83-p7"></script>
+  <script src="api.js?b=84-p7"></script>
+  <script src="bridge.js?b=84-p7"></script>
+  <script src="updater.js?b=84-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=83-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=84-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur

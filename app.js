@@ -2078,12 +2078,10 @@
       if (Wrapper.env && Wrapper.env.stt === 'whisper') Wrapper.send({ type: 'mic-preload' }); // dictée Whisper : préchargement du modèle
       C.isOpen = true; $('#chat').classList.add('open'); setNew(false); if (C.unread) setUnread(C.unread); document.body.classList.add('chat-open'); $('#tab-coach').classList.add('on');
       if (ctx) setCtx(ctx);
-      if (Fm.pref) setFull(true, { keep: true }); // v83 : retour dans le dernier mode (page)
       pin(3500); C.touching = false; C.userAt = 0; layout(); toEnd(); hardEnd(1500); load().then(function () { if (C.stick || pinned()) { toEnd(false); hardEnd(800); } }); loadBrief(); schedule();
       if (!MOBILE.matches) setTimeout(function () { input.focus(); }, 50); // mobile : pas de clavier imposé
     }
     function close() {
-      if (Fm.on) setFull(false, { keep: true }); // v83 : on quitte le mode page sans oublier le choix
       if (MOBILE.matches && C.isOpen) window.scrollTo(0, 0);
       C.isOpen = false; pill.hidden = true; clearInterval(C.tick);
       $('#chat').classList.remove('open'); document.body.classList.remove('chat-open'); $('#tab-coach').classList.remove('on');
@@ -2156,64 +2154,11 @@
     try { var dr = localStorage.getItem(DKEY); if (dr && !input.value) { input.value = dr; setTimeout(function () { input.dispatchEvent(new Event('input')); }, 0); } } catch (err) {}
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); trySend(e); } });
 
-    // ---- v83 : taille du chat (texte A−/A+ ; desktop/iPad : poignée) + mode page (Coach seul).
-    // Aucun recalage ajouté : on ne touche qu'à des variables CSS / une classe ; le ResizeObserver v82 garde le bas si on y était.
-    var chatEl = $('#chat'), zm = $('#chat-zm'), zp = $('#chat-zp'), fb = $('#chat-full');
-    var ZS = [85, 100, 115, 130, 150, 175], Zi = 1, ZK = 'dcap-chat-z', FK = 'dcap-chat-full', SK = 'dcap-chat-size';
-    var Fm = { on: false, pref: false, pushed: false };
-    try { var zi0 = ZS.indexOf(parseInt(localStorage.getItem(ZK), 10)); if (zi0 >= 0) Zi = zi0; Fm.pref = localStorage.getItem(FK) === '1'; } catch (err) {}
-    // garde la même ligne en haut du fil quand la taille change (si on n'est pas collé au bas)
-    function keepAnchor(fn) {
-      var st = C.stick, ref = null, off = 0, top = sc.getBoundingClientRect().top;
-      if (!st) { var ch = box.children; for (var i = 0; i < ch.length; i++) { var r = ch[i].getBoundingClientRect(); if (r.bottom > top + 2) { ref = ch[i]; off = r.top - top; break; } } }
-      fn();
-      if (st) stickNow(); else if (ref) sc.scrollTop += ref.getBoundingClientRect().top - top - off;
-    }
-    function fitInput() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight + 2, 132) + 'px'; }
-    function applyZ() {
-      chatEl.style.setProperty('--cz', String(ZS[Zi] / 100));
-      zm.disabled = Zi === 0; zp.disabled = Zi === ZS.length - 1;
-      zm.title = zm.getAttribute('aria-label') + ' (' + ZS[Zi] + ' %)'; zp.title = zp.getAttribute('aria-label') + ' (' + ZS[Zi] + ' %)';
-    }
-    function setZ(i) {
-      i = Math.max(0, Math.min(ZS.length - 1, i)); if (i === Zi) return; Zi = i;
-      try { localStorage.setItem(ZK, String(ZS[Zi])); } catch (err) {}
-      keepAnchor(function () { applyZ(); if (input.value) fitInput(); });
-      toast('Texte du chat : ' + ZS[Zi] + ' %', 1200);
-    }
-    applyZ();
-    // boutons : action sur pointerdown (+ preventDefault) pour garder le focus et le clavier ouvert, comme « Envoyer » (v81)
-    function tool(btn, fn) {
-      btn.addEventListener(window.PointerEvent ? 'pointerdown' : 'touchstart', function (e) { if (e.button > 0) return; e.preventDefault(); btn._pd = Date.now(); fn(); }, { passive: false });
-      btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
-      btn.addEventListener('click', function (e) { e.preventDefault(); if (Date.now() - (btn._pd || 0) < 800) return; fn(); });
-    }
-    tool(zm, function () { setZ(Zi - 1); });
-    tool(zp, function () { setZ(Zi + 1); });
-    // mode page
-    function setFull(on, o) {
-      o = o || {}; on = !!on; if (on === Fm.on) return;
-      if (on && !C.isOpen) return;
-      keepAnchor(function () {
-        Fm.on = on; document.body.classList.toggle('chat-full', on);
-        fb.setAttribute('aria-pressed', on ? 'true' : 'false');
-        fb.setAttribute('aria-label', on ? 'Réduire le coach (quitter le mode page)' : 'Agrandir le coach en mode page');
-        fb.title = on ? 'Réduire (Échap)' : 'Agrandir (mode page)';
-        $('.ct-t', fb).textContent = on ? 'Réduire' : 'Agrandir';
-        layout();
-      });
-      if (!o.keep) { Fm.pref = on; try { localStorage.setItem(FK, on ? '1' : '0'); } catch (err) {} }
-      // touche retour / geste retour iOS : une entrée d'historique tant que le mode page est ouvert
-      if (on && !Fm.pushed) { try { history.pushState({ dcapChatFull: 1 }, ''); Fm.pushed = true; } catch (err) {} }
-      else if (!on && Fm.pushed && !o.fromPop) { Fm.pushed = false; try { history.back(); } catch (err) {} }
-      relayout();
-    }
-    tool(fb, function () { setFull(!Fm.on); });
-    window.addEventListener('popstate', function () { if (Fm.on) { Fm.pushed = false; setFull(false, { fromPop: true }); } });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && Fm.on && !$('#modal').classList.contains('open')) { e.preventDefault(); setFull(false); } });
-    // desktop / iPad : poignée en haut à gauche du panneau (ancré en bas à droite) ; double clic = taille d'origine
+    // ---- v84 : fenêtre du Coach redimensionnable (grand écran / iPad). Aucune action sur iPhone (panneau plein écran, v82 intact).
+    // Le panneau est ancré en bas à droite : on tire la poignée (haut gauche) vers le haut / la gauche pour l'agrandir.
     (function () {
-      var grip = $('#chat-grip'), W0 = 390, H0 = 600, drag = null;
+      var chatEl = $('#chat'), grip = $('#chat-grip'), SK = 'dcap-chat-size', drag = null;
+      try { localStorage.removeItem('dcap-chat-z'); localStorage.removeItem('dcap-chat-full'); } catch (err) {} // restes de la v83 (boutons retirés)
       function clamp(w, h) { return [Math.max(320, Math.min(window.innerWidth - 24, Math.round(w))), Math.max(360, Math.min(window.innerHeight - 120, Math.round(h)))]; }
       function setSize(w, h, save) {
         if (w === null) { chatEl.style.removeProperty('--cw'); chatEl.style.removeProperty('--chh'); if (save) try { localStorage.removeItem(SK); } catch (err) {} return; }
@@ -2222,12 +2167,12 @@
       }
       try { var sv = JSON.parse(localStorage.getItem(SK) || 'null'); if (sv && sv.length === 2) setSize(sv[0], sv[1], false); } catch (err) {}
       grip.addEventListener('pointerdown', function (e) {
-        if (Fm.on || MOBILE.matches) return; e.preventDefault();
+        if (MOBILE.matches) return; e.preventDefault();
         var r = chatEl.getBoundingClientRect(); drag = { x: e.clientX, y: e.clientY, w: r.width, h: r.height };
         try { grip.setPointerCapture(e.pointerId); } catch (err) {} document.body.classList.add('chat-resizing');
       });
       grip.addEventListener('pointermove', function (e) { if (drag) setSize(drag.w + (drag.x - e.clientX), drag.h + (drag.y - e.clientY), false); });
-      function end(e) { if (!drag) return; drag = null; document.body.classList.remove('chat-resizing'); var r = chatEl.getBoundingClientRect(); setSize(r.width, r.height, true); }
+      function end() { if (!drag) return; drag = null; document.body.classList.remove('chat-resizing'); var r = chatEl.getBoundingClientRect(); setSize(r.width, r.height, true); }
       grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
       grip.addEventListener('dblclick', function () { setSize(null, null, true); });
       window.addEventListener('resize', function () { if (!MOBILE.matches && chatEl.style.getPropertyValue('--cw')) { var r = chatEl.getBoundingClientRect(); setSize(r.width, r.height, false); } });
