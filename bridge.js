@@ -61,15 +61,37 @@
         return W.worker;
       }
       W.preload = function () { var w = worker(); if (w && !W.loaded && !W.preloading) { W.preloading = true; w.postMessage({ type: 'load' }); } };
+      // v87 : le micro n'est demandé (getUserMedia) qu'une fois par session d'app. Le MediaStream est gardé et réutilisé d'un vocal à l'autre
+      // (piste désactivée entre deux enregistrements, coupée après 2 min d'inactivité ou quand l'app passe en arrière-plan) ;
+      // on ne redemande que si la piste est terminée (ended) ou coupée par iOS (muted).
+      W.stream = null; W.idle = null;
+      function micLive() { var t = W.stream && W.stream.getAudioTracks()[0]; return !!(t && t.readyState === 'live' && !t.muted); }
+      function micDrop() { clearTimeout(W.idle); W.idle = null; var s = W.stream; W.stream = null; if (s) s.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} }); }
+      W.mic = function () {
+        clearTimeout(W.idle); W.idle = null;
+        if (micLive()) { W.stream.getAudioTracks().forEach(function (t) { t.enabled = true; }); return Promise.resolve(W.stream); }
+        micDrop();
+        return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }).then(function (stream) {
+          W.stream = stream;
+          stream.getAudioTracks().forEach(function (t) { t.addEventListener('ended', function () { if (W.stream === stream) W.stream = null; }); });
+          return stream;
+        });
+      };
+      W.micRelease = function () {
+        if (!W.stream) return;
+        W.stream.getAudioTracks().forEach(function (t) { t.enabled = false; });
+        clearTimeout(W.idle); W.idle = setTimeout(micDrop, window.DCAP_MIC_IDLE_MS || 120000);
+      };
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && !W.rec) micDrop(); });
       W.start = function () {
         if (W.rec) return; W.preload();
-        navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }).then(function (stream) {
+        W.mic().then(function (stream) {
           var mime = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].filter(function (t) { return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t); })[0];
           var r = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined), parts = [], t0 = Date.now();
           W.rec = r;
           r.ondataavailable = function (e) { if (e.data && e.data.size) parts.push(e.data); };
           r.onstop = function () {
-            clearInterval(W.tick); stream.getTracks().forEach(function (t) { t.stop(); }); W.rec = null;
+            clearInterval(W.tick); W.micRelease(); W.rec = null;
             var blob = new Blob(parts, { type: r.mimeType || mime || 'audio/mp4' });
             if (Date.now() - t0 < 500 || !blob.size) { post({ type: 'speech-end' }); return; }
             st('transcribing');
