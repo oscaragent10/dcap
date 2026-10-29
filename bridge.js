@@ -146,8 +146,21 @@
       }).catch(function (err) { post({ type: 'push-error', error: String(err && err.message || err) }); });
     };
     // toucher une notification alors que l'app est déjà ouverte : le worker nous prévient → on ouvre le Coach
-    if (PUSH_OK) navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.type === 'open-coach') { if (peer) post({ type: 'open-coach' }); else wantCoach = true; } });
-    var wantCoach = /[?&]tab=coach\b/.test(location.search);
+    // v88 : toucher une notification → Coach ouvert sur le dernier message, données rechargées. Trois canaux (le premier qui arrive gagne, les autres sont inoffensifs) :
+    //  (1) l'URL ?open=coach (ou ?tab=coach), (2) le message du worker (app déjà ouverte), (3) une « intention » déposée par le worker dans le cache 'dcap-intent'
+    //  (valable 2 min, consommée une fois) : couvre les cas où iOS ouvre l'app à son adresse de départ sans l'URL de la notification, ou recharge la page (mise à jour) avant que le Coach soit ouvert.
+    function takeIntent() {
+      if (!window.caches) return Promise.resolve(false);
+      var key = new URL('__open-coach', document.baseURI).href;
+      return caches.open('dcap-intent').then(function (c) {
+        return c.match(key).then(function (r) { if (!r) return false; return r.text().then(function (t) { return c.delete(key).then(function () { return Date.now() - (+t || 0) < 120000; }); }); });
+      }).catch(function () { return false; });
+    }
+    function checkIntent() { if (!peer) return; takeIntent().then(function (ok) { if (ok) post({ type: 'open-coach' }); }); }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.type === 'open-coach') { if (peer) { post({ type: 'open-coach' }); takeIntent(); } else wantCoach = true; } });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') checkIntent(); });
+    window.addEventListener('pageshow', checkIntent);
+    var wantCoach = /[?&](tab|open)=coach\b/.test(location.search);
     if (wantCoach && history.replaceState) history.replaceState(null, '', location.pathname);
     // première ouverture de l'app installée : proposer une fois (puis via 🔔 dans le Coach)
     if (STANDALONE && PUSH_OK && Notification.permission === 'default') { var later = 0; try { later = +localStorage.getItem('dcap-notif-later') || 0; } catch (e) {} if (Date.now() - later > 7 * 864e5) setTimeout(showSheet, 2500); }
@@ -157,7 +170,7 @@
       peer = { w: e.source, o: e.origin };
       if (m.type === 'hello') {
         post(env());
-        if (wantCoach) { wantCoach = false; post({ type: 'open-coach' }); }
+        if (wantCoach) { wantCoach = false; post({ type: 'open-coach' }); takeIntent(); } else checkIntent();
         if (PUSH_OK && Notification.permission === 'granted') sendSub(false).catch(function () {}); // rafraîchit l'abonnement dans le Sheet
       }
       else if (m.type === 'reload') { location.reload(); }

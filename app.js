@@ -2139,7 +2139,7 @@
       }
       else if (m.type === 'speech-error') { micUi(false); mic.busy = false; micStatus(''); toast(m.error === 'not-allowed' || m.error === 'service-not-allowed' ? 'Micro refusé : autorise le micro et la dictée (Réglages › Safari / Siri) ou utilise la dictée du clavier' : m.error === 'no-speech' ? 'Rien entendu' : 'Dictée indisponible (' + m.error + ')', 5000); }
       else if (m.type === 'env') layout();
-      else if (m.type === 'open-coach') { if (!C.isOpen) open(); else { load(); toEnd(true); } } // toucher une notification
+      else if (m.type === 'open-coach') { if (!C.isOpen) open(); pin(2500); load().then(function () { C.stick = true; pin(2500); toEnd(false); hardEnd(800); }); } // v88 : toucher une notification → Coach ouvert, messages rechargés du serveur, fil au dernier message // toucher une notification
     });
     $('#ctx-clear').onclick = function (e) { e.preventDefault(); setCtx(null); };
     // v81 : envoi sur pointerdown (+ preventDefault) : le champ garde le focus, le clavier reste ouvert et le blur n'avale plus le tap.

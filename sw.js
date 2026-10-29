@@ -1,7 +1,7 @@
 /* DCAP PWA (bêta) — service worker : coquille hors ligne + bibliothèques CDN + notifications Web Push du coach.
    Les données ne passent jamais par ce cache (API Apps Script en POST, cache IndexedDB géré par api.js). */
-var SHELL = 'dcapb-shell-461d926e34', LIBS = 'dcapb-libs-v1';
-var SHELL_URLS = ['./index.html', './app.js?b=87-p7', './api.js?b=87-p7', './bridge.js?b=87-p7', './updater.js?b=87-p7', './manifest.webmanifest', './icons/dcap-192.png', './icons/dcap-180.png'];
+var SHELL = 'dcapb-shell-0a80c71b05', LIBS = 'dcapb-libs-v1';
+var SHELL_URLS = ['./index.html', './app.js?b=88-p7', './api.js?b=88-p7', './bridge.js?b=88-p7', './updater.js?b=88-p7', './manifest.webmanifest', './icons/dcap-192.png', './icons/dcap-180.png'];
 var LIB_HOSTS = /^(cdn\.jsdelivr\.net|unpkg\.com|fonts\.googleapis\.com|fonts\.gstatic\.com)$/;
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(SHELL).then(function (c) { return c.addAll(SHELL_URLS.map(function (u) { return new Request(u, { cache: 'reload' }); })); }).then(function () { return self.skipWaiting(); }));
@@ -49,16 +49,21 @@ self.addEventListener('fetch', function (e) {
 self.addEventListener('push', function (e) {
   var d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
-  var opts = { body: d.body || 'Nouveau message du coach', icon: 'icons/dcap-192.png', badge: 'icons/dcap-192.png', tag: d.tag || 'dcap-coach', renotify: true, data: { url: './?tab=coach' } };
+  var opts = { body: d.body || 'Nouveau message du coach', icon: 'icons/dcap-192.png', badge: 'icons/dcap-192.png', tag: d.tag || 'dcap-coach', renotify: true, data: { url: './?open=coach' } };
   var jobs = [self.registration.showNotification(d.title || 'Coach DCAP', opts)];
   if (typeof d.badge === 'number' && self.navigator.setAppBadge) jobs.push(self.navigator.setAppBadge(d.badge).catch(function () {}));
   e.waitUntil(Promise.all(jobs));
 });
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
-  var url = new URL('./?tab=coach', self.registration.scope).href;
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
-    for (var i = 0; i < list.length; i++) { var c = list[i]; if (c.url.indexOf(self.registration.scope) === 0 && 'focus' in c) { c.postMessage({ dcap: 1, type: 'open-coach' }); return c.focus(); } }
+  var url = new URL('./?open=coach', self.registration.scope).href;
+  // v88 : intention « ouvrir le Coach » déposée dans un cache dédié (lue puis supprimée par la page) : marche même si iOS ouvre l'app sans l'URL ci-dessus
+  var intent = caches.open('dcap-intent').then(function (c) { return c.put(new URL('__open-coach', self.registration.scope).href, new Response(String(Date.now()))); }).catch(function () {});
+  e.waitUntil(intent.then(function () { return self.clients.matchAll({ type: 'window', includeUncontrolled: true }); }).then(function (list) {
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      if (c.url.indexOf(self.registration.scope) === 0) { c.postMessage({ dcap: 1, type: 'open-coach' }); return ('focus' in c ? c.focus() : null); }
+    }
     return self.clients.openWindow(url);
-  }));
+  }).catch(function () { return self.clients.openWindow(url).catch(function () {}); }));
 });
