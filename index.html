@@ -1032,6 +1032,31 @@ body.panel-open .tabbar{display:none!important}
 /* v89 : texte saisi plus petit dans tous les champs (Paul). Pas de zoom iOS au focus : viewport maximum-scale=1 (déjà en place, Api.gs + PWA). */
 input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=button]):not([type=submit]),textarea,select{font-size:13px!important}
 #chat textarea{font-size:13px!important}
+.gym-head .gx-top{align-items:center} .gym-order.on{background:var(--green);border-color:var(--green);color:#fff}
+.gym-ord-hint{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px}
+.gym-ex.gx-ord{display:flex;align-items:center;gap:10px;padding:10px 6px 10px 12px;transition:box-shadow .15s}
+.gx-ordn{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:16px}
+.gx-ordt{flex:1;min-width:0} .gx-ordt .gx-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gx-ud{display:flex;gap:4px} .gx-ud button{width:32px;height:32px;border:1px solid var(--line);background:var(--card);border-radius:6px;font-size:15px;color:var(--ink);padding:0;touch-action:manipulation}
+.gx-ud button:disabled{opacity:.3}
+.gx-handle{width:40px;height:44px;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--ink-2);touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
+.gym-ex.gx-ord.drag{position:relative;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.18);opacity:.97}
+/* v90 : page « Modifier l'exercice » */
+body.ge-open{overflow:hidden}
+#gx-edit{position:fixed;inset:0;z-index:2000;background:var(--parchment);display:flex;flex-direction:column;overscroll-behavior:contain}
+.ge-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:max(10px,env(safe-area-inset-top)) 12px 10px;border-bottom:1px solid var(--line);background:var(--card)}
+.ge-bar b{font-family:var(--head);font-size:16px}
+.ge-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px max(24px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:16px}
+.ge-f{display:flex;flex-direction:column;gap:6px}
+.ge-f input,.ge-f textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius);background:#fff;color:var(--ink);width:100%;box-sizing:border-box}
+.ge-sets{display:flex;flex-direction:column;gap:6px}
+.ge-set{display:flex;align-items:center;gap:8px;min-height:40px}
+.ge-set label{display:flex;align-items:center;gap:4px;flex:1;min-width:0}
+.ge-set input{width:100%;min-width:0;text-align:center;font:inherit;padding:6px 4px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.ge-set small,.ge-set i{font-family:var(--mono);font-size:11px;color:var(--muted);font-style:normal}
+.ge-done{width:16px;color:var(--green);text-align:center}
+.ge-row{display:flex;gap:8px}
+.ge-rm{color:#b3261e;align-self:flex-start}
 </style>
 
 </head>
@@ -1108,17 +1133,17 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=button]
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '89-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '90-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=89-p7"></script>
-  <script src="bridge.js?b=89-p7"></script>
-  <script src="updater.js?b=89-p7"></script>
+  <script src="api.js?b=90-p7"></script>
+  <script src="bridge.js?b=90-p7"></script>
+  <script src="updater.js?b=90-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=89-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=90-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur

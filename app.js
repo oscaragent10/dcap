@@ -499,15 +499,21 @@
     var d = G.d, a = d.activity, h = '';
     h += '<div class="sec"><h2><span class="n">◆</span>' + esc(d.session === 'Muscu' ? 'Séance' : d.session) + '</h2><div class="right"><span class="mono-label">' + esc(dayLabel(d.date)) + '</span>' +
       '<button class="btn btn-ghost btn-sm" id="gym-back" aria-label="Retour">‹ Semaine</button></div></div>';
-    h += '<div class="gym-head card"><div class="gym-ttl">' + esc(d.title || '') + '</div><div class="gym-sub"><span id="gym-save" class="gym-save"></span>' +
+    h += '<div class="gym-head card"><div class="gx-top"><div class="gym-ttl">' + esc(d.title || '') + '</div><button class="btn btn-ghost btn-sm gym-order' + (G.order ? ' on' : '') + '" id="gym-order">' + (G.order ? 'OK' : '≡ Ordre') + '</button></div>' + (G.order ? '<div class="gym-ord-hint">Glisse ≡ (ou ↑ ↓) pour changer l\'ordre des exos.</div>' : '') + '<div class="gym-sub"><span id="gym-save" class="gym-save"></span>' +
       (a ? '<span class="gym-act">Garmin : ' + esc(dur(a.duration_s)) + (a.avg_hr ? ' · FC ' + a.avg_hr : '') + '</span>' : '<span class="gym-act muted">pas encore d\'activité Garmin ce jour</span>') +
       (G.finished ? '<span class="gym-fin">Terminée ✓</span>' : '') + '</div></div>';
     G.ex.forEach(function (e, i) {
+      if (G.order) { // v90 : mode « Modifier » → cartes compactes, poignée ≡ à droite
+        var nd = e.sets.filter(function (s) { return s.status === 'done'; }).length;
+        h += '<div class="card gym-ex gx-ord" data-ex="' + i + '"><div class="gx-ordn">' + (i + 1) + '</div><div class="gx-ordt"><div class="gx-name">' + esc(e.name) + '</div><div class="gx-obj">' + nd + '/' + e.sets.length + ' séries validées</div></div>' +
+          '<span class="gx-ud"><button data-act="up" aria-label="Monter"' + (i === 0 ? ' disabled' : '') + '>↑</button><button data-act="down" aria-label="Descendre"' + (i === G.ex.length - 1 ? ' disabled' : '') + '>↓</button></span><span class="gx-handle" aria-label="Glisser pour réordonner">≡</span></div>';
+        return;
+      }
       var p = G.prevMap[e.name], prev = p && p.prev ? p.prev.text : '';
       h += '<div class="card gym-ex" data-ex="' + i + '"><div class="gx-top"><div><div class="gx-name">' + esc(e.name) + (e.unilateral ? ' <em class="gx-uni">G/D</em>' : '') + '</div>' +
         (e.target ? '<div class="gx-obj">' + esc(e.target) + '</div>' : '') + (prev ? '<div class="gx-prev">Dernière : ' + esc(prev) + '</div>' : '') +
         (p && p.notes ? '<div class="gx-prev">' + esc(p.notes) + '</div>' : '') + '</div>' +
-        '<button class="gx-menu btn btn-ghost btn-sm" data-act="menu" aria-label="Options de l\'exercice">⋯</button></div>';
+        '<button class="gx-menu btn btn-ghost btn-sm" data-act="edit" aria-label="Modifier l\'exercice">Modifier</button></div>';
       h += '<div class="gx-sets">';
       e.sets.forEach(function (s, j) {
         h += '<div class="gx-set' + (e.unilateral ? ' uni' : '') + (s.status === 'done' ? ' done' : '') + '" data-set="' + j + '"><span class="gx-n">' + (j + 1) + '</span>' +
@@ -515,9 +521,7 @@
           (e.unilateral ? gymReps('reps_g', s.reps_g, 'G') + gymReps('reps_d', s.reps_d, 'D') : gymReps('reps', s.reps, '')) +
           '<button class="gx-ok" data-act="ok" aria-label="Valider la série">✓</button></div>';
       });
-      h += '</div>' + (RPE_UI === 'claude2' ? rpeClaude2Html(e) : RPE_UI === 'claude' ? rpeClaudeHtml(e) : rpeWheelHtml(e)) + '<div class="gx-tools"><button class="btn btn-ghost btn-sm" data-act="add">+ série</button><button class="btn btn-ghost btn-sm" data-act="del"' + (e.sets.length <= 1 ? ' disabled' : '') + '>− série</button></div>' +
-        '<div class="gx-repl" hidden><div class="gx-step"><span class="mono-label">Pas de charge</span>' + [5, 2.5].map(function (v) { return '<button class="pill' + (gymStep(e, i) === v ? ' on' : '') + '" data-act="step" data-v="' + v + '">' + String(v).replace('.', ',') + ' lbs</button>'; }).join('') + '</div>' +
-        '<div class="gx-rrow"><input list="gym-prog" placeholder="Remplacer par…" value=""><button class="btn btn-sm" data-act="repl-ok">OK</button><button class="btn btn-ghost btn-sm" data-act="rm">Retirer</button></div><button class="btn btn-ghost btn-sm gx-close" data-act="menu">Fermer</button></div></div>';
+      h += '</div>' + (RPE_UI === 'claude2' ? rpeClaude2Html(e) : RPE_UI === 'claude' ? rpeClaudeHtml(e) : rpeWheelHtml(e)) + '<div class="gx-tools"><button class="btn btn-ghost btn-sm" data-act="add">+ série</button><button class="btn btn-ghost btn-sm" data-act="del"' + (e.sets.length <= 1 ? ' disabled' : '') + '>− série</button></div></div>';
     });
     var prog = []; Object.keys(d.program).forEach(function (k) { d.program[k].forEach(function (p) { prog.push(p); }); });
     h += '<datalist id="gym-prog">' + prog.map(function (p) { return '<option value="' + esc(p[0]) + '">'; }).join('') + '</datalist>';
@@ -542,6 +546,8 @@
       var v = $('#gym-new').value.trim(); if (!v) return;
       G.ex.push(gymFromParsed(gymLookup(v))); gymSaveSoon(); renderGym();
     };
+    $('#gym-order').onclick = function () { G.order = !G.order; gymPanel(false); renderGym(); };
+    if (G.order) { gymOrderBind(); return; }
     $$('.gym-ex').forEach(function (card) {
       var i = +card.getAttribute('data-ex'), e = G.ex[i];
       if (RPE_UI === 'claude2') rpeClaude2(card, e); else if (RPE_UI === 'claude') rpeClaude(card, e); else rpeWheel(card, e);
@@ -562,11 +568,106 @@
         else if (act === 'del') { if (e.sets.length > 1) e.sets.pop(); re = true; }
         else if (act === 'menu') { var rp = $('.gx-repl', card); rp.hidden = !rp.hidden; gymPanel(!rp.hidden); if (!rp.hidden) { var rpi = $('input', rp); setTimeout(function () { rpi.scrollIntoView({ block: 'center' }); }, 50); } return; }
         else if (act === 'repl-ok') { var nv = $('.gx-repl input', card).value.trim(); if (!nv) return; var ne = gymFromParsed(gymLookup(nv)); ne.sets = e.sets.map(function () { return JSON.parse(JSON.stringify(ne.sets[0])); }); G.ex[i] = ne; re = true; }
+        else if (act === 'edit') { gymEdit(i); return; }
+        else if (act === 'order') { G.order = true; gymPanel(false); renderGym(); var oc = $('.gym-ex[data-ex="' + i + '"]'); if (oc) oc.scrollIntoView({ block: 'center' }); return; }
         else if (act === 'rm') { if (!confirm('Retirer « ' + e.name + ' » ?')) return; G.ex.splice(i, 1); re = true; }
         else return;
         if (re) gymPanel(false);
         ev.stopPropagation(); gymSaveSoon();
         if (re) renderGym(); else gymPaint(card, e);
+      });
+    });
+  }
+  // v90 : page plein écran « Modifier l'exercice » (champs existants uniquement : nom, objectif/récup, séries charge/reps, pas de charge, note).
+  // Travaille sur une copie ; « Enregistrer » remplace l'exo (même objet logique, séries conservées), « Annuler » ne change rien.
+  function gymEdit(i) {
+    var src = G.ex[i]; if (!src) return;
+    var e = JSON.parse(JSON.stringify(src)), y0 = window.scrollY, step0 = gymStep(src, i), step = step0;
+    var ov = document.createElement('div'); ov.id = 'gx-edit'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Modifier l\'exercice');
+    var num = function (v) { return v === null || v === undefined || v === '' ? '' : String(v); };
+    var setsHtml = function () {
+      return e.sets.map(function (s, j) {
+        return '<div class="ge-set" data-set="' + j + '"><span class="gx-n">' + (j + 1) + '</span>' +
+          '<label><input inputmode="decimal" data-f="weight_lbs" value="' + num(s.weight_lbs) + '"><small>lbs</small></label>' +
+          (e.unilateral ? '<label><i>G</i><input inputmode="numeric" data-f="reps_g" value="' + num(s.reps_g) + '"></label><label><i>D</i><input inputmode="numeric" data-f="reps_d" value="' + num(s.reps_d) + '"></label>'
+            : '<label><input inputmode="numeric" data-f="reps" value="' + num(s.reps) + '"><small>reps</small></label>') +
+          (s.status === 'done' ? '<span class="ge-done">✓</span>' : '<span class="ge-done"></span>') + '</div>';
+      }).join('');
+    };
+    ov.innerHTML = '<div class="ge-bar"><button class="btn btn-ghost btn-sm" data-ge="cancel">Annuler</button><b>Modifier l\'exercice</b><button class="btn btn-green btn-sm" data-ge="save">Enregistrer</button></div>' +
+      '<div class="ge-body">' +
+      '<label class="ge-f"><span class="mono-label">Exercice</span><input id="ge-name" list="gym-prog" value="' + esc(e.name) + '"></label>' +
+      '<label class="ge-f"><span class="mono-label">Objectif · récup</span><input id="ge-target" value="' + esc(e.target || '') + '" placeholder="ex. 3×8–10 · 45 lbs · récup 1\'30"></label>' +
+      '<div class="ge-f"><span class="mono-label">Séries</span><div class="ge-sets">' + setsHtml() + '</div>' +
+      '<div class="ge-row"><button class="btn btn-ghost btn-sm" data-ge="add">+ série</button><button class="btn btn-ghost btn-sm" data-ge="del">− série</button></div></div>' +
+      '<div class="ge-f"><span class="mono-label">Pas de charge</span><div class="gx-step">' + [5, 2.5].map(function (v) { return '<button class="pill' + (step === v ? ' on' : '') + '" data-ge="step" data-v="' + v + '">' + String(v).replace('.', ',') + ' lbs</button>'; }).join('') + '</div></div>' +
+      '<label class="ge-f"><span class="mono-label">Note de l\'exercice</span><textarea id="ge-note" rows="3" placeholder="Réglage machine, sensations…">' + esc(e.note || '') + '</textarea></label>' +
+      '<button class="btn btn-ghost btn-sm ge-rm" data-ge="rm">Retirer cet exercice de la séance</button></div>';
+    document.body.appendChild(ov); document.body.classList.add('ge-open'); gymPanel(true);
+    var read = function () { // relit les champs dans la copie
+      e.name = $('#ge-name', ov).value.trim() || src.name; e.target = $('#ge-target', ov).value.trim(); e.note = $('#ge-note', ov).value;
+      $$('.ge-set', ov).forEach(function (r) { var s = e.sets[+r.getAttribute('data-set')]; $$('input', r).forEach(function (inp) { var v = inp.value.replace(',', '.').trim(); s[inp.getAttribute('data-f')] = v === '' || isNaN(+v) ? null : Math.max(0, +v); }); });
+    };
+    var paintSets = function () { $('.ge-sets', ov).innerHTML = setsHtml(); $('[data-ge="del"]', ov).disabled = e.sets.length <= 1; };
+    var close = function () { ov.remove(); document.body.classList.remove('ge-open'); gymPanel(false); };
+    paintSets();
+    ov.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-ge]'); if (!b) return; var a = b.getAttribute('data-ge');
+      if (a === 'cancel') { close(); return; }
+      if (a === 'add') { read(); var c = JSON.parse(JSON.stringify(e.sets[e.sets.length - 1] || { weight_lbs: null, reps: null })); c.status = 'todo'; e.sets.push(c); paintSets(); return; }
+      if (a === 'del') { read(); if (e.sets.length > 1) e.sets.pop(); paintSets(); return; }
+      if (a === 'step') { step = +b.getAttribute('data-v'); $$('[data-ge="step"]', ov).forEach(function (x) { x.classList.toggle('on', x === b); }); return; }
+      if (a === 'rm') { if (!confirm('Retirer « ' + src.name + ' » de la séance ?')) return; close(); G.ex.splice(i, 1); gymSaveSoon(); renderGym(); window.scrollTo(0, y0); return; }
+      if (a === 'save') {
+        read(); G.ex[i] = e;
+        if (step !== step0) { G.d.steps = G.d.steps || {}; G.d.steps[gymKey(e.name)] = step; gymPersistStep(e.name, step, 0); }
+        close(); gymSaveSoon(); renderGym(); window.scrollTo(0, y0);
+      }
+    });
+  }
+  // v90 : réordonner les exos (mode « Modifier »). Les séries/notes/RPE voyagent avec l'objet exercice ; l'ordre est enregistré via uiStrengthSave (StrengthLog.ex_idx), jamais dans Plan.
+  function gymMove(order) {
+    var old = G.ex; G.ex = order.map(function (k) { return old[k]; });
+    if (order.some(function (k, n) { return k !== n; })) gymSaveSoon();
+    renderGym();
+  }
+  function gymOrderBind() {
+    var list = $$('.gym-ex.gx-ord'), n = G.ex.length;
+    list.forEach(function (card) {
+      var i = +card.getAttribute('data-ex');
+      card.addEventListener('click', function (ev) {
+        var b = ev.target.closest('[data-act]'); if (!b) return;
+        var j = b.getAttribute('data-act') === 'up' ? i - 1 : i + 1; if (j < 0 || j >= n) return;
+        var o = []; for (var k = 0; k < n; k++) o.push(k); o[i] = j; o[j] = i;
+        if (navigator.vibrate) navigator.vibrate(8);
+        gymMove(o);
+      });
+      var hd = $('.gx-handle', card), drag = null;
+      var y = function (ev) { return ev.touches ? ev.touches[0].clientY : ev.clientY; };
+      var start = function (ev) {
+        if (drag) return; ev.preventDefault();
+        var r = card.getBoundingClientRect();
+        drag = { grab: y(ev) - r.top, t: 0 }; card.classList.add('drag'); if (navigator.vibrate) navigator.vibrate(8);
+      };
+      var move = function (ev) {
+        if (!drag) return; ev.preventDefault();
+        var py = y(ev), nat = card.getBoundingClientRect().top - drag.t;
+        var pv = card.previousElementSibling, nx = card.nextElementSibling;
+        if (pv && pv.classList.contains('gx-ord')) { var pr = pv.getBoundingClientRect(); if (py - drag.grab < pr.top + pr.height / 2) { card.parentNode.insertBefore(card, pv); nat = card.getBoundingClientRect().top - drag.t; if (navigator.vibrate) navigator.vibrate(4); } }
+        if (nx && nx.classList.contains('gx-ord')) { var nr = nx.getBoundingClientRect(); if (py - drag.grab + card.offsetHeight > nr.top + nr.height / 2) { card.parentNode.insertBefore(nx, card); nat = card.getBoundingClientRect().top - drag.t; if (navigator.vibrate) navigator.vibrate(4); } }
+        drag.t = py - drag.grab - nat; card.style.transform = 'translateY(' + drag.t.toFixed(1) + 'px)';
+      };
+      var end = function () {
+        if (!drag) return; drag = null; card.classList.remove('drag'); card.style.transform = '';
+        gymMove($$('.gym-ex.gx-ord').map(function (c) { return +c.getAttribute('data-ex'); }));
+      };
+      hd.addEventListener('touchstart', start, { passive: false });
+      hd.addEventListener('touchmove', move, { passive: false });
+      hd.addEventListener('touchend', end); hd.addEventListener('touchcancel', end);
+      hd.addEventListener('mousedown', function (ev) {
+        start(ev);
+        var mm = function (e2) { move(e2); }, mu = function () { document.removeEventListener('mousemove', mm); document.removeEventListener('mouseup', mu); end(); };
+        document.addEventListener('mousemove', mm); document.addEventListener('mouseup', mu);
       });
     });
   }
