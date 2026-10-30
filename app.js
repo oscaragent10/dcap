@@ -164,6 +164,7 @@
     if (nm === 'wk' && S.view === 'week' && (curWeekMonday() || S.curMonday) === key) renderWeek(d, true);
     else if (nm === 'mo' && S.view === 'month' && S.ym && S.ym[0] + '-' + S.ym[1] === key) renderMonth(d);
     else if (nm === 'gr' && S.view === 'graph') lib('Chart').then(function () { if (S.view === 'graph') { destroyCharts(); renderGraph(d); } });
+    else if (nm === 'rp' && S.view === 'race' && (S.race || '_') === key) lib('Chart').then(function () { if (S.view !== 'race') return; destroyCharts(); if (S.map) { S.map.remove(); S.map = null; } renderRace(d); }); // v92 : fiche course rafraîchie
     else if (nm === 'pf' && S.view === 'perf') lib('Chart').then(function () { if (S.view === 'perf') { destroyCharts(); renderPerf(d); } });
   }
   var WK = mkStore('wk'), MO = mkStore('mo'), STALE_MS = 120000;
@@ -447,7 +448,7 @@
     var draftKey = 'dcap-gym-' + d.date + '|' + d.plan_id, draft = null;
     try { draft = JSON.parse(localStorage.getItem(draftKey) || 'null'); } catch (e) {}
     if (d.log && d.log.exercises.length && !(draft && draft.t > Date.parse(d.log.updated_at || 0))) {
-      ex = d.log.exercises.map(function (e) { return { name: e.name, unilateral: !!e.unilateral, rpe: e.rpe === null || e.rpe === '' ? null : +e.rpe, note: e.note || '', target: e.target || '', sets: e.sets.map(function (s) { return { weight_lbs: s.weight_lbs === null ? null : +s.weight_lbs, reps: s.reps === null ? null : +s.reps, reps_g: s.reps_g === null ? null : +s.reps_g, reps_d: s.reps_d === null ? null : +s.reps_d, status: s.status === 'done' ? 'done' : 'todo' }; }) }; });
+      ex = d.log.exercises.map(function (e) { return { name: e.name, unilateral: !!e.unilateral, rpe: e.rpe === null || e.rpe === '' ? null : +e.rpe, note: e.note || '', target: e.target || '', sets: e.sets.map(function (s) { return { weight_lbs: s.weight_lbs === null ? null : +s.weight_lbs, weight_d: s.weight_d === null || s.weight_d === undefined || s.weight_d === '' ? null : +s.weight_d, reps: s.reps === null ? null : +s.reps, reps_g: s.reps_g === null ? null : +s.reps_g, reps_d: s.reps_d === null ? null : +s.reps_d, status: s.status === 'done' ? 'done' : 'todo' }; }) }; });
     } else if (draft && draft.ex) ex = draft.ex;
     else {
       var src = d.parsed.exercises.length ? d.parsed.exercises : (d.program[d.session] || []).map(function (p) { return { name: p[0], sets: 3, reps_min: 8, reps_max: 10, weight_lbs: p[1], unilateral: /bulgar|step|unilat|pallof/i.test(p[0]) }; });
@@ -518,7 +519,7 @@
       h += '<div class="gx-sets">';
       e.sets.forEach(function (s, j) {
         h += '<div class="gx-set' + (e.unilateral ? ' uni' : '') + (s.status === 'done' ? ' done' : '') + '" data-set="' + j + '"><span class="gx-n">' + (j + 1) + '</span>' +
-          '<span class="gx-w"><button data-act="w-" aria-label="Moins">−</button><b>' + gymNum(s.weight_lbs) + '</b><small>lbs</small><button data-act="w+" aria-label="Plus">+</button></span>' +
+          '<span class="gx-w"><button data-act="w-" aria-label="Moins">−</button><b>' + gymNum(s.weight_lbs) + '</b><small>lbs' + (e.unilateral && s.weight_d !== null && s.weight_d !== undefined ? ' <em class="gx-wd">D ' + gymNum(s.weight_d) + '</em>' : '') + '</small><button data-act="w+" aria-label="Plus">+</button></span>' +
           (e.unilateral ? gymReps('reps_g', s.reps_g, 'G') + gymReps('reps_d', s.reps_d, 'D') : gymReps('reps', s.reps, '')) +
           '<button class="gx-ok" data-act="ok" aria-label="Valider la série">✓</button></div>';
       });
@@ -555,7 +556,7 @@
       card.addEventListener('click', function (ev) {
         var b = ev.target.closest('[data-act]'); if (!b) return;
         var act = b.getAttribute('data-act'), row = b.closest('[data-set]'), j = row ? +row.getAttribute('data-set') : -1, s = j >= 0 ? e.sets[j] : null, re = false;
-        if (act === 'w-' || act === 'w+') { var st = gymStep(e, i); s.weight_lbs = Math.max(0, Math.round(((+s.weight_lbs || 0) + (act === 'w+' ? st : -st)) * 2) / 2); }
+        if (act === 'w-' || act === 'w+') { var st = gymStep(e, i); s.weight_lbs = Math.max(0, Math.round(((+s.weight_lbs || 0) + (act === 'w+' ? st : -st)) * 2) / 2); if (s.weight_d !== null && s.weight_d !== undefined) { s.weight_d = Math.max(0, Math.round((s.weight_d + (act === 'w+' ? st : -st)) * 2) / 2); re = true; } }
         else if (act === 'step') { var sv = +b.getAttribute('data-v'); G.d.steps = G.d.steps || {}; G.d.steps[gymKey(e.name)] = sv; gymPersistStep(e.name, sv, 0); gymPanel(false); renderGym(); return; }
         else if (act === 'r-' || act === 'r+') { var f = b.parentNode.getAttribute('data-f'); s[f] = Math.max(0, (+s[f] || 0) + (act === 'r+' ? 1 : -1)); }
         else if (act === 'ok') {
@@ -588,10 +589,10 @@
     var num = function (v) { return v === null || v === undefined || v === '' ? '' : String(v); };
     var setsHtml = function () {
       return e.sets.map(function (s, j) {
-        return '<div class="ge-set" data-set="' + j + '"><span class="gx-n">' + (j + 1) + '</span>' +
-          '<label><input inputmode="decimal" data-f="weight_lbs" value="' + num(s.weight_lbs) + '"><small>lbs</small></label>' +
-          (e.unilateral ? '<label><i>G</i><input inputmode="numeric" data-f="reps_g" value="' + num(s.reps_g) + '"></label><label><i>D</i><input inputmode="numeric" data-f="reps_d" value="' + num(s.reps_d) + '"></label>'
-            : '<label><input inputmode="numeric" data-f="reps" value="' + num(s.reps) + '"><small>reps</small></label>') +
+        var side = function (lb, wf, rf) { return '<div class="ge-side"><i>' + lb + '</i><label><input inputmode="decimal" data-f="' + wf + '" value="' + num(wf === 'weight_d' && (s.weight_d === null || s.weight_d === undefined) ? s.weight_lbs : s[wf]) + '"><small>lbs</small></label><label><input inputmode="numeric" data-f="' + rf + '" value="' + num(s[rf]) + '"><small>reps</small></label></div>'; };
+        return '<div class="ge-set' + (e.unilateral ? ' uni' : '') + '" data-set="' + j + '"><span class="gx-n">' + (j + 1) + '</span>' +
+          (e.unilateral ? '<div class="ge-lr">' + side('G', 'weight_lbs', 'reps_g') + side('D', 'weight_d', 'reps_d') + '</div>'
+            : '<label><input inputmode="decimal" data-f="weight_lbs" value="' + num(s.weight_lbs) + '"><small>lbs</small></label><label><input inputmode="numeric" data-f="reps" value="' + num(s.reps) + '"><small>reps</small></label>') +
           (s.status === 'done' ? '<span class="ge-done">✓</span>' : '<span class="ge-done"></span>') + '</div>';
       }).join('');
     };
@@ -599,6 +600,7 @@
       '<div class="ge-body">' +
       '<label class="ge-f"><span class="mono-label">Exercice</span><input id="ge-name" list="gym-prog" value="' + esc(e.name) + '"></label>' +
       '<label class="ge-f"><span class="mono-label">Objectif · récup</span><input id="ge-target" value="' + esc(e.target || '') + '" placeholder="ex. 3×8–10 · 45 lbs · récup 1\'30"></label>' +
+      '<div class="ge-f"><span class="mono-label">Côtés</span><div class="gx-step"><button class="pill' + (e.unilateral ? '' : ' on') + '" data-ge="uni" data-v="0">Les deux ensemble</button><button class="pill' + (e.unilateral ? ' on' : '') + '" data-ge="uni" data-v="1">Gauche / Droite</button></div></div>' +
       '<div class="ge-f"><span class="mono-label">Séries</span><div class="ge-sets">' + setsHtml() + '</div>' +
       '<div class="ge-row"><button class="btn btn-ghost btn-sm" data-ge="add">+ série</button><button class="btn btn-ghost btn-sm" data-ge="del">− série</button></div></div>' +
       '<div class="ge-f"><span class="mono-label">Pas de charge</span><div class="gx-step">' + [5, 2.5].map(function (v) { return '<button class="pill' + (step === v ? ' on' : '') + '" data-ge="step" data-v="' + v + '">' + String(v).replace('.', ',') + ' lbs</button>'; }).join('') + '</div></div>' +
@@ -607,7 +609,8 @@
     document.body.appendChild(ov); document.body.classList.add('ge-open'); gymPanel(true);
     var read = function () { // relit les champs dans la copie
       e.name = $('#ge-name', ov).value.trim() || src.name; e.target = $('#ge-target', ov).value.trim(); e.note = $('#ge-note', ov).value;
-      $$('.ge-set', ov).forEach(function (r) { var s = e.sets[+r.getAttribute('data-set')]; $$('input', r).forEach(function (inp) { var v = inp.value.replace(',', '.').trim(); s[inp.getAttribute('data-f')] = v === '' || isNaN(+v) ? null : Math.max(0, +v); }); });
+      $$('.ge-set', ov).forEach(function (r) { var s = e.sets[+r.getAttribute('data-set')]; $$('input', r).forEach(function (inp) { var v = inp.value.replace(',', '.').trim(); s[inp.getAttribute('data-f')] = v === '' || isNaN(+v) ? null : Math.max(0, +v); });
+        if (e.unilateral && s.weight_d === s.weight_lbs) s.weight_d = null; });
     };
     var paintSets = function () { $('.ge-sets', ov).innerHTML = setsHtml(); $('[data-ge="del"]', ov).disabled = e.sets.length <= 1; };
     var close = function () { ov.remove(); document.body.classList.remove('ge-open'); gymPanel(false); };
@@ -617,6 +620,10 @@
       if (a === 'cancel') { close(); return; }
       if (a === 'add') { read(); var c = JSON.parse(JSON.stringify(e.sets[e.sets.length - 1] || { weight_lbs: null, reps: null })); c.status = 'todo'; e.sets.push(c); paintSets(); return; }
       if (a === 'del') { read(); if (e.sets.length > 1) e.sets.pop(); paintSets(); return; }
+      if (a === 'uni') { read(); var on = b.getAttribute('data-v') === '1'; if (on === !!e.unilateral) return; e.unilateral = on; // v92 : split G/D, rien n'est effacé
+        if (on) e.sets.forEach(function (s) { if (s.reps_g === null || s.reps_g === undefined) s.reps_g = s.reps; if (s.reps_d === null || s.reps_d === undefined) s.reps_d = s.reps; });
+        else e.sets.forEach(function (s) { if (s.reps === null || s.reps === undefined) s.reps = s.reps_g !== null && s.reps_g !== undefined ? s.reps_g : s.reps_d; });
+        $$('[data-ge="uni"]', ov).forEach(function (x) { x.classList.toggle('on', x === b); }); paintSets(); return; }
       if (a === 'step') { step = +b.getAttribute('data-v'); $$('[data-ge="step"]', ov).forEach(function (x) { x.classList.toggle('on', x === b); }); return; }
       if (a === 'rm') { if (!confirm('Retirer « ' + src.name + ' » de la séance ?')) return; close(); G.ex.splice(i, 1); gymSaveSoon(); renderGym(); window.scrollTo(0, y0); return; }
       if (a === 'save') {
@@ -1348,7 +1355,9 @@
   function fetchRace(name) { return fetchCached(RP, name || '_', 'uiRacePlan', [name || '']); }
   function loadRace() {
     loading();
-    Promise.all([fetchRace(S.race), lib('Chart'), lib('L')]).then(function (r) { if (S.view === 'race') renderRace(r[0]); }).catch(fail);
+    var key = S.race || '_';
+    Promise.all([fetchRace(S.race), lib('Chart'), lib('L')]).then(function (r) { if (S.view !== 'race') return; renderRace(r[0]);
+      revalidate(RP, key, 'uiRacePlan', [S.race || ''], function (d) { quietRender('rp', key, d); }); }).catch(fail); // v92 : jamais figé sur une vieille fiche
   }
   function clockAdd(start, min) { var m = /^(\d{1,2})[:h](\d{2})/.exec(start || ''); if (!m) return ''; var t = (+m[1]) * 60 + (+m[2]) + Math.round(min); return Math.floor(t / 60) % 24 + 'h' + ('0' + t % 60).slice(-2); }
   function hmin(min) { min = Math.round(min); return Math.floor(min / 60) + ':' + ('0' + min % 60).slice(-2); }
@@ -1374,8 +1383,9 @@
       var c, sub = '', mg = 0;
       if (GP) { var k = i < GP.gold ? 'gold' : i < GP.gold + GP.kiwi ? 'kiwi' : 'ravito'; c = k === 'kiwi'; mg = c ? GP.mg : 0;
         sub = k === 'gold' ? 'Honey Stinger Gold · sans caféine' : k === 'kiwi' ? 'Kiwi fraise · ' + GP.mg + ' mg caféine' : 'Kiwi max atteint · glucides au ravito'; }
-      else c = cafTimes.length ? cafTimes.some(function (x) { return Math.abs(x - t) <= every / 2; }) : (cafHalf && t >= T / 2 && i % 2 === 0);
-      ev.push({ t: t, km: md.kmAt(t), kind: 'gel', txt: 'Gel ' + (i + 1) + ' (' + gG + ' g G)' + (!GP && c ? ' · caféiné' : ''), sub: sub, caf: c, g: gG, mg: mg, rav: GP && sub.indexOf('ravito') > 0 });
+      else { c = cafTimes.length ? cafTimes.some(function (x) { return Math.abs(x - t) <= every / 2; }) : (cafHalf && t >= T / 2 && i % 2 === 0); mg = c ? cafMg(R) : 0; }
+      var na = GP && sub.indexOf('ravito') < 0 ? (c ? 50 : 45) : 0;
+      ev.push({ na: na, t: t, km: md.kmAt(t), kind: 'gel', txt: 'Gel ' + (i + 1) + ' (' + gG + ' g G)' + (!GP && c ? ' · caféiné' : ''), sub: sub, caf: c, g: gG, mg: mg, rav: GP && sub.indexOf('ravito') > 0 });
     });
     var water = +R.water_ml_h || 0, sod = +R.sodium_mg_l || 0, aid = (C && C.aid) || [], scale = md.scale, stops = [0].concat(aid.map(function (a) { return a.km * scale; })).concat([md.dist]);
     for (var i = 0; i < stops.length - 1; i++) {
@@ -1383,9 +1393,24 @@
       var nm = i === 0 ? 'Départ' : aid[i - 1].name, need = ml ? 'porter ~' + ml + ' mL jusqu\'au ' + (i + 1 < stops.length - 1 ? 'ravito suivant' : 'bout') + ' (' + hmin(t1 - t0) + ')' + (sod ? ', ' + Math.round(ml * sod / 1000) + ' mg de sodium' : '') : '';
       ev.push({ t: t0, km: stops[i], kind: i === 0 ? 'start' : 'aid', txt: nm + (i === 0 ? '' : ' · ravito'), sub: need });
     }
+    saltEvents(d, md).forEach(function (x) { ev.push(x); });
     ev.push({ t: T, km: md.dist, kind: 'end', txt: 'Arrivée' });
-    ev.sort(function (a, b) { return a.t - b.t || (a.kind === 'gel' ? 1 : -1); });
+    ev.sort(function (a, b) { return a.t - b.t || (a.kind === 'gel' || a.kind === 'salt' ? 1 : -1); });
     return ev;
+  }
+  function cafMg(R) { var m = /(\d+)\s*mg/i.exec(String(R.caffeine || '') + ' ' + String(R.fueling || '')); return m ? +m[1] : 32; }
+  /** v92 : SaltStick (215 mg Na/caps) selon la règle du profil nutrition : 0 caps/h sous 20 °C, 1 de 20 à 25 °C, 2 au-dessus de 25 °C (température de l'heure). */
+  var SALT_NA = 215;
+  function saltPerH(temp) { return temp === null || temp === undefined || isNaN(temp) ? null : temp > 25 ? 2 : temp >= 20 ? 1 : 0; }
+  function raceTempAt(d, min) { var W = d.weather || {}, hs = W.hours || [], m = /^(\d{1,2})(?:[:h](\d{2}))?/.exec(d.race.start_time || ''); if (!m) return null; var hh = +m[1] + Math.floor(((+m[2] || 0) + min) / 60);
+    var x = hs.filter(function (h) { return parseInt(h.h, 10) === hh; })[0]; return x ? +x.t : null; }
+  function saltEvents(d, md) {
+    var T = md.total, out = []; if (!T) return out;
+    for (var h = 0; h * 60 < T - 10; h++) {
+      var tp = raceTempAt(d, h * 60 + 30), k = saltPerH(tp); if (!k) continue;
+      (k === 2 ? [15, 45] : [30]).forEach(function (m) { var t = h * 60 + m; if (t < T - 5) out.push({ t: t, km: md.kmAt(t), kind: 'salt', txt: 'SaltStick (' + SALT_NA + ' mg Na)', sub: 'avec de l\'eau · ' + n(tp, 0) + ' °C prévus', na: SALT_NA }); });
+    }
+    return out;
   }
   /** v91 : marques des gels lues sur la fiche course (« 3 Honey Stinger Gold puis Kiwi fraise caféinés (32 mg, 10 max) »). */
   function gelPlan(R) {
@@ -1397,17 +1422,19 @@
     var el = document.getElementById('rp-fuel'); if (!el) return;
     var R = d.race, T = md.total, gels = ev.filter(function (e) { return e.kind === 'gel'; }), H = Math.ceil(T / 60), bars = [], caf = [];
     for (var h = 0; h < H; h++) bars.push({ x: h * 60 + 30, y: gels.filter(function (g) { return g.t >= h * 60 && g.t < h * 60 + 60; }).reduce(function (a, g) { return a + g.g; }, 0) });
+    var sod = []; for (var h2 = 0; h2 < H; h2++) sod.push({ x: h2 * 60 + 30, y: ev.filter(function (g) { return g.na && g.t >= h2 * 60 && g.t < h2 * 60 + 60; }).reduce(function (a, g) { return a + g.na; }, 0) });
     for (var t = 0; t <= T + 60; t += 5) caf.push({ x: t, y: Math.round(gels.reduce(function (a, g) { return a + (g.mg && g.t <= t ? g.mg * Math.pow(0.5, (t - g.t) / 300) : 0); }, 0)) });
     var ch = new Chart(el, { data: { datasets: [
       { type: 'bar', label: 'Glucides (g/h)', data: bars, yAxisID: 'y', backgroundColor: 'rgba(232,168,48,.55)', borderColor: '#E8A830', borderWidth: 1, barPercentage: 1, categoryPercentage: .9 },
-      { type: 'line', label: 'Caféine (mg)', data: caf, yAxisID: 'y1', borderColor: '#7A4A1E', borderWidth: 2, pointRadius: 0, tension: .2, fill: false }] },
+      { type: 'line', label: 'Caféine (mg)', data: caf, yAxisID: 'y1', borderColor: '#C2410C', backgroundColor: 'rgba(194,65,12,.12)', borderWidth: 3, pointRadius: 0, tension: .2, fill: true, order: -1 },
+      { type: 'line', label: 'Sodium (mg/h)', data: sod, yAxisID: 'y1', borderColor: '#2F6DB5', borderWidth: 2, borderDash: [5, 4], pointRadius: 3, pointBackgroundColor: '#2F6DB5', fill: false, order: -2 }] },
       options: { responsive: true, maintainAspectRatio: false, animation: false, parsing: true, interaction: { mode: 'nearest', axis: 'x', intersect: false },
         plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
           tooltip: { callbacks: { title: function (it) { var x = it[0].parsed.x; return it[0].dataset.type === 'bar' ? clockAdd(R.start_time, x - 30) + ' → ' + clockAdd(R.start_time, x + 30) : clockAdd(R.start_time, x); },
-            label: function (it) { return it.dataset.type === 'bar' ? it.parsed.y + ' g de glucides' : it.parsed.y + ' mg de caféine'; } } } },
+            label: function (it) { return it.dataset.type === 'bar' ? it.parsed.y + ' g de glucides' : it.datasetIndex === 2 ? it.parsed.y + ' mg de sodium/h' : it.parsed.y + ' mg de caféine'; } } } },
         scales: { x: { type: 'linear', min: 0, max: T + 60, ticks: { stepSize: 60, callback: function (v) { return clockAdd(R.start_time, v); } }, grid: { display: false } },
           y: { position: 'left', beginAtZero: true, suggestedMax: 90, title: { display: true, text: 'g/h' }, ticks: { maxTicksLimit: 5 } },
-          y1: { position: 'right', beginAtZero: true, grid: { display: false }, title: { display: true, text: 'mg' }, ticks: { maxTicksLimit: 5 } } } } });
+          y1: { display: true, position: 'right', beginAtZero: true, suggestedMax: 300, grid: { display: false }, title: { display: true, text: 'mg', color: '#C2410C' }, ticks: { maxTicksLimit: 5, color: '#C2410C' } } } } });
     S.charts.push(ch);
   }
   function wxIcon(h) { var c = h.code; if (c === undefined) return h.mm > 0.2 ? '🌧' : ''; return c >= 95 ? '⛈' : c >= 71 && c <= 86 ? '🌨' : c >= 51 ? '🌧' : c >= 45 ? '🌫' : c >= 2 ? '⛅' : '☀️'; }
@@ -1429,9 +1456,13 @@
       for (var k = 1; k < pp.length; k++) { var dz = pp[k][2] - pp[k - 1][2]; if (dz > 0) up += dz; else dn -= dz; }
       return '<div class="rp-sr"><i style="background:' + (i % 2 ? PAL.route : PAL.trail) + '"></i><span class="nm">' + esc(s.name) + '</span><span>' + n(b - a, 1) + ' km · +' + n(up) + ' / −' + n(dn) + ' m</span>' +
         (t0 !== null ? '<em>' + hmin(t0) + ' → ' + hmin(t1) + ' · ' + clockAdd(R.start_time, t1) + '</em>' : '') + '</div>'; }).join('') + '</div>' : '';
-    var gl = ev.filter(function (e) { return e.kind === 'gel'; }), gT = gl.reduce(function (a, e) { return a + e.g; }, 0), mT = gl.reduce(function (a, e) { return a + (e.mg || 0); }, 0), GP = gelPlan(R);
+    var gl = ev.filter(function (e) { return e.kind === 'gel'; }), gT = gl.reduce(function (a, e) { return a + e.g; }, 0), mT = gl.reduce(function (a, e) { return a + (e.mg || 0); }, 0), GP = gelPlan(R), naT = ev.reduce(function (a, e) { return a + (e.na || 0); }, 0), nSalt = ev.filter(function (e) { return e.kind === 'salt'; }).length;
     var fsum = md.total && gl.length ? '<div class="card pad rp-fs"><div><b>' + gl.length + ' gels</b><small>' + (GP ? GP.gold + ' Gold · ' + Math.min(GP.kiwi, Math.max(0, gl.length - GP.gold)) + ' Kiwi' + (gl.length > GP.gold + GP.kiwi ? ' · ' + (gl.length - GP.gold - GP.kiwi) + ' ravito' : '') : '1 toutes les ' + (gl[1] ? gl[1].t - gl[0].t : 20) + ' min') + '</small></div>' +
-      '<div><b>' + n(gT / md.total * 60) + ' g/h</b><small>' + n(gT) + ' g G au total</small></div><div><b>' + n(mT) + ' mg</b><small>caféine · demi-vie 5 h</small></div></div>' +
+      '<div><b>' + n(gT / md.total * 60) + ' g/h</b><small>' + n(gT) + ' g G au total</small></div><div><b>' + n(mT) + ' mg</b><small>caféine · demi-vie 5 h</small></div>' +
+      '<div><b>' + n(naT / md.total * 60) + ' mg/h</b><small>sodium · ' + n(naT) + ' mg' + (R.water_ml_h && R.sodium_mg_l ? ' (cible ' + n(R.water_ml_h * R.sodium_mg_l / 1000) + '/h)' : '') + '</small></div>' +
+      '<div><b>' + nSalt + ' SaltStick</b><small>' + SALT_NA + ' mg Na/caps</small></div>' +
+      '<div><b>' + (R.water_ml_h ? n(R.water_ml_h) + ' mL/h' : '—') + '</b><small>eau</small></div></div>' +
+      '<div class="sub rp-salt">SaltStick selon la température de chaque heure : 0 caps/h sous 20 °C · 1 de 20 à 25 °C · 2 au-dessus (plan nutrition).' + (nSalt ? '' : ' Météo prévue sous 20 °C : aucune capsule, le sodium vient des gels.') + '</div>' +
       '<div class="card rp-fuel"><canvas id="rp-fuel"></canvas></div>' : '';
     var tl = '<h3 class="pf-h">Gels &amp; hydratation</h3>' + fsum + (md.total ? '<div class="card rp-tl">' + ev.map(function (e) {
       return '<div class="rp-ev k-' + e.kind + (e.caf ? ' caf' : '') + (e.rav ? ' rav' : '') + '"><span class="t">' + hmin(e.t) + '<small>' + clockAdd(R.start_time, e.t) + '</small></span><span class="km">km ' + n(e.km, 1) + '</span><span class="tx"><b>' + esc(e.txt) + '</b>' + (e.sub ? '<small>' + esc(e.sub) + '</small>' : '') + '</span></div>'; }).join('') +
