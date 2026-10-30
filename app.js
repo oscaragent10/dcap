@@ -278,15 +278,15 @@
   }
   /** Ligne « course » du Programme (prévu ↔ réalisé). */
   function capRow(x, day, past) {
-    var p = x.plan, a = x.act, st = a ? 'done' : (p.status === 'missed' || (past && p.status !== 'done') ? 'missed' : 'todo');
+    var p = x.plan, a = x.act, rcn = !a && p && p.type === 'course' && day.races && day.races.length ? day.races[0].name : null, st = a ? 'done' : (p.status === 'missed' || (past && p.status !== 'done') ? 'missed' : 'todo');
     var tg = surfTag(a, p), sf = tg === 'Trail' ? 'trail' : tg === 'Course' ? 'race' : 'route';
-    return '<div class="prow cap is-' + st + ' sp-' + sf + '"' + (a ? ' data-act="' + esc(a.activity_id) + '" role="button" tabindex="0"' : ' data-desc="' + esc(p.plan_id) + '" role="button" tabindex="0"') + '>' +
+    return '<div class="prow cap is-' + st + ' sp-' + sf + '"' + (a ? ' data-act="' + esc(a.activity_id) + '" role="button" tabindex="0"' : rcn ? ' data-race="' + esc(rcn) + '" role="button" tabindex="0"' : ' data-desc="' + esc(p.plan_id) + '" role="button" tabindex="0"') + '>' +
       '<span class="pt">' + tg + '</span><span class="pm">' +
       '<span class="ttl"' + (p && p.title ? ' title="' + esc(p.title) + '"' : '') + '>' + esc(p ? shortTitle(p.title || p.type) : a.name) + (st === 'missed' ? ' <em class="miss">manquée</em>' : '') + (!p && day.plans.length ? ' <em>hors plan</em>' : '') + '</span>' +
       (p ? '<span class="meta plan">' + planMeta(p) + '</span>' : '') +
       (a ? '<span class="meta did">✓ ' + actMeta(a) + '</span>' : '') + '</span>' +
       (p && a ? '<button class="info" data-desc="' + esc(p.plan_id) + '" aria-label="Description de la séance">i</button>' : '') +
-      '<span class="go">' + (a ? '›' : '') + '</span></div>';
+      '<span class="go">' + (a || rcn ? '›' : '') + '</span></div>';
   }
   /** Ligne « muscu » : même gabarit qu'une sortie, libellé Muscu + type (Push, Pull…), accent jaune. */
   function gymRow(kind, meta, st, p) {
@@ -329,7 +329,7 @@
     d.days.forEach(function (day) {
       var di = dowIdx(day.date), past = day.date < d.today, pairs = pairDay(day);
       h += '<div class="pday' + (day.is_today ? ' today' : '') + (past ? ' past' : '') + '"><div class="pd-date"><b>' + DOW[di] + '</b><span>' + dm(day.date) + '</span>' + (day.is_today ? '<i>auj.</i>' : '') + '</div><div class="pd-body">';
-      day.races.forEach(function (rc) { h += '<div class="race-flag">🏁 ' + esc(rc.name) + ' · ' + n(rc.distance_km, 1) + ' km · ' + n(rc.d_plus_m) + ' m D+' + (rc.target_time ? ' · objectif ' + esc(rc.target_time) : '') + '</div>'; });
+      day.races.forEach(function (rc) { h += '<div class="race-flag rf-go" data-race="' + esc(rc.name) + '" role="button" tabindex="0">🏁 ' + esc(rc.name) + ' · ' + n(rc.distance_km, 1) + ' km · ' + n(rc.d_plus_m) + ' m D+' + (rc.target_time ? ' · objectif ' + esc(rc.target_time) : '') + '<span class="go">Plan ›</span></div>'; });
       // Toutes les séances du jour (course + muscu) dans l'ordre chronologique (heure réelle, sinon heure prévue).
       var rows = [], seq = 0;
       pairs.forEach(function (x) { rows.push({ t: (x.act && x.act.start_time) || (x.plan && x.plan.start_time) || '', k: seq++, html: capRow(x, day, past) }); });
@@ -355,6 +355,7 @@
     $$('[data-wk]').forEach(function (b) { b.onclick = function () { var k = +b.getAttribute('data-wk'); go('week', { day: k ? addDays(d.monday, k) : null }); }; });
     bindCommon(d.days.reduce(function (acc, x) { return acc.concat(x.plans, x.gym); }, []));
     $$('.prow[role=button]').forEach(function (el) { el.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } }; });
+    bindRaceLinks(); // v91 : course → Plan de course
     var op = $('#open-props'); if (op) op.onclick = function () { Chat.open(); };
     hideSplash();
   }
@@ -1116,12 +1117,12 @@
     $$('.md.sel').forEach(function (x) { x.classList.remove('sel'); }); if (el) el.classList.add('sel');
     var c = d.cells.filter(function (x) { return x.date === date; })[0]; if (!c) return;
     var h = '<div class="sec" style="margin-top:0"><h2>' + DOW_L[dowIdx(date)] + ' ' + dm(date) + '</h2><button class="btn btn-ghost btn-sm" id="m-close" aria-label="Fermer">✕</button></div><div class="dsheet">';
-    c.races.forEach(function (r) { h += '<div class="race-flag" style="margin-bottom:8px">🏁 ' + esc(r.name) + (r.distance_km ? ' · ' + n(r.distance_km, 1) + ' km' : '') + (r.d_plus_m ? ' · ' + n(r.d_plus_m) + ' m D+' : '') + '</div>'; });
+    c.races.forEach(function (r) { h += '<button class="race-flag rf-go" data-race="' + esc(r.name) + '" style="margin-bottom:8px">🏁 ' + esc(r.name) + (r.distance_km ? ' · ' + n(r.distance_km, 1) + ' km' : '') + (r.d_plus_m ? ' · ' + n(r.d_plus_m) + ' m D+' : '') + '<span class="go">Plan ›</span></button>'; });
     var list = c.items.filter(function (it) { return it.status === 'done' || !c.beyond_horizon; });
     list.forEach(function (it) {
       var done = it.status === 'done', km = +(it.act_km || it.km) || 0, k = c.items.indexOf(it);
       var meta = [km ? n(km, done ? 2 : 1) + ' km' : '', it.duration_s ? dur(it.duration_s) : '', it.pace_s_km ? pace(it.pace_s_km) + '/km' : '', it.d_plus_m ? '+' + n(it.d_plus_m) + ' m' : '', done ? '' : statusLbl(it.status)].filter(Boolean).join(' · ');
-      h += '<button class="it" data-k="' + k + '">' + runDot(km, c.races.length && done ? 'race' : surfOf(it), { size: 40, planned: !done, missed: it.status === 'missed' }) +
+      h += '<button class="it" data-k="' + k + '"' + (!done && it.type === 'course' && c.races.length ? ' data-race="' + esc(c.races[0].name) + '"' : '') + '>' + runDot(km, c.races.length && done ? 'race' : surfOf(it), { size: 40, planned: !done, missed: it.status === 'missed' }) +
         '<span class="tx"><b>' + esc(it.title || it.type) + '</b><span>' + meta + '</span></span><span class="go">›</span></button>';
     });
     (c.other || []).forEach(function (o) { h += '<button class="it sp-' + esc(o.type) + '" data-oact="' + esc(o.activity_id) + '"><span class="sbig">' + esc(sportTag(o).charAt(0)) + '</span><span class="tx"><b>' + esc(o.name || TYPE_LBL[o.type]) + '</b><span>' + sportMeta(o).join(' · ').replace(/<[^>]+>/g, '') + '</span></span><span class="go">›</span></button>'; });
@@ -1134,7 +1135,8 @@
     $('#m-week').onclick = function () { closeModal(); go('week', { day: date }); };
     $$('.dsheet [data-gym]').forEach(function (b) { b.onclick = function () { closeModal(); go('gym', { plan_id: b.getAttribute('data-gym') }); }; });
     $$('.dsheet [data-oact]').forEach(function (b) { b.onclick = function () { closeModal(); go('detail', { id: b.getAttribute('data-oact') }); }; });
-    $$('.dsheet button.it:not([data-oact])').forEach(function (b) {
+    $$('.dsheet [data-race]').forEach(function (b) { b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); closeModal(); go('race', { name: b.getAttribute('data-race') }); }; });
+    $$('.dsheet button.it:not([data-oact]):not([data-race])').forEach(function (b) {
       b.onclick = function () {
         var it = c.items[+b.getAttribute('data-k')]; closeModal();
         if (it.activity_id && it.status === 'done') go('detail', { id: String(it.activity_id) }); else go('week', { day: date });
@@ -1367,9 +1369,13 @@
     var fromStart = /1re minute|1ère minute|dès le départ|dès la 1/i.test(R.fueling || ''), ev = [];
     var caf = String(R.caffeine || ''), cafTimes = (caf.match(/\d{1,2}:\d{2}/g) || []).map(durMin), cafHalf = /moiti|2e|second/i.test(caf);
     var gels = []; for (var t = fromStart ? 0 : every; t < T - 8; t += every) gels.push(t);
+    var GP = gelPlan(R), gG = Math.round(+R.gel_g || 24);
     gels.forEach(function (t, i) {
-      var c = cafTimes.length ? cafTimes.some(function (x) { return Math.abs(x - t) <= every / 2; }) : (cafHalf && t >= T / 2 && i % 2 === 0);
-      ev.push({ t: t, km: md.kmAt(t), kind: 'gel', txt: 'Gel ' + (i + 1) + (c ? ' · caféiné' : ''), caf: c });
+      var c, sub = '', mg = 0;
+      if (GP) { var k = i < GP.gold ? 'gold' : i < GP.gold + GP.kiwi ? 'kiwi' : 'ravito'; c = k === 'kiwi'; mg = c ? GP.mg : 0;
+        sub = k === 'gold' ? 'Honey Stinger Gold · sans caféine' : k === 'kiwi' ? 'Kiwi fraise · ' + GP.mg + ' mg caféine' : 'Kiwi max atteint · glucides au ravito'; }
+      else c = cafTimes.length ? cafTimes.some(function (x) { return Math.abs(x - t) <= every / 2; }) : (cafHalf && t >= T / 2 && i % 2 === 0);
+      ev.push({ t: t, km: md.kmAt(t), kind: 'gel', txt: 'Gel ' + (i + 1) + ' (' + gG + ' g G)' + (!GP && c ? ' · caféiné' : ''), sub: sub, caf: c, g: gG, mg: mg, rav: GP && sub.indexOf('ravito') > 0 });
     });
     var water = +R.water_ml_h || 0, sod = +R.sodium_mg_l || 0, aid = (C && C.aid) || [], scale = md.scale, stops = [0].concat(aid.map(function (a) { return a.km * scale; })).concat([md.dist]);
     for (var i = 0; i < stops.length - 1; i++) {
@@ -1380,6 +1386,29 @@
     ev.push({ t: T, km: md.dist, kind: 'end', txt: 'Arrivée' });
     ev.sort(function (a, b) { return a.t - b.t || (a.kind === 'gel' ? 1 : -1); });
     return ev;
+  }
+  /** v91 : marques des gels lues sur la fiche course (« 3 Honey Stinger Gold puis Kiwi fraise caféinés (32 mg, 10 max) »). */
+  function gelPlan(R) {
+    var f = String(R.fueling || '') + ' ' + String(R.caffeine || ''), g = /(\d+)\s*(?:Honey Stinger\s*)?Gold/i.exec(f), k = /Kiwi[^.;]*?(\d+)\s*max/i.exec(f), mg = /(\d+)\s*mg/i.exec(String(R.caffeine || '')) || /Kiwi[^.;]*?(\d+)\s*mg/i.exec(f);
+    return g && k ? { gold: +g[1], kiwi: +k[1], mg: mg ? +mg[1] : 32 } : null;
+  }
+  /** v91 : glucides par heure (barres) + caféine dans le corps (demi-vie 5 h, somme des prises). */
+  function drawFuelChart(d, md, ev) {
+    var el = document.getElementById('rp-fuel'); if (!el) return;
+    var R = d.race, T = md.total, gels = ev.filter(function (e) { return e.kind === 'gel'; }), H = Math.ceil(T / 60), bars = [], caf = [];
+    for (var h = 0; h < H; h++) bars.push({ x: h * 60 + 30, y: gels.filter(function (g) { return g.t >= h * 60 && g.t < h * 60 + 60; }).reduce(function (a, g) { return a + g.g; }, 0) });
+    for (var t = 0; t <= T + 60; t += 5) caf.push({ x: t, y: Math.round(gels.reduce(function (a, g) { return a + (g.mg && g.t <= t ? g.mg * Math.pow(0.5, (t - g.t) / 300) : 0); }, 0)) });
+    var ch = new Chart(el, { data: { datasets: [
+      { type: 'bar', label: 'Glucides (g/h)', data: bars, yAxisID: 'y', backgroundColor: 'rgba(232,168,48,.55)', borderColor: '#E8A830', borderWidth: 1, barPercentage: 1, categoryPercentage: .9 },
+      { type: 'line', label: 'Caféine (mg)', data: caf, yAxisID: 'y1', borderColor: '#7A4A1E', borderWidth: 2, pointRadius: 0, tension: .2, fill: false }] },
+      options: { responsive: true, maintainAspectRatio: false, animation: false, parsing: true, interaction: { mode: 'nearest', axis: 'x', intersect: false },
+        plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+          tooltip: { callbacks: { title: function (it) { var x = it[0].parsed.x; return it[0].dataset.type === 'bar' ? clockAdd(R.start_time, x - 30) + ' → ' + clockAdd(R.start_time, x + 30) : clockAdd(R.start_time, x); },
+            label: function (it) { return it.dataset.type === 'bar' ? it.parsed.y + ' g de glucides' : it.parsed.y + ' mg de caféine'; } } } },
+        scales: { x: { type: 'linear', min: 0, max: T + 60, ticks: { stepSize: 60, callback: function (v) { return clockAdd(R.start_time, v); } }, grid: { display: false } },
+          y: { position: 'left', beginAtZero: true, suggestedMax: 90, title: { display: true, text: 'g/h' }, ticks: { maxTicksLimit: 5 } },
+          y1: { position: 'right', beginAtZero: true, grid: { display: false }, title: { display: true, text: 'mg' }, ticks: { maxTicksLimit: 5 } } } } });
+    S.charts.push(ch);
   }
   function wxIcon(h) { var c = h.code; if (c === undefined) return h.mm > 0.2 ? '🌧' : ''; return c >= 95 ? '⛈' : c >= 71 && c <= 86 ? '🌨' : c >= 51 ? '🌧' : c >= 45 ? '🌫' : c >= 2 ? '⛅' : '☀️'; }
   function renderRaceList(d) {
@@ -1400,8 +1429,12 @@
       for (var k = 1; k < pp.length; k++) { var dz = pp[k][2] - pp[k - 1][2]; if (dz > 0) up += dz; else dn -= dz; }
       return '<div class="rp-sr"><i style="background:' + (i % 2 ? PAL.route : PAL.trail) + '"></i><span class="nm">' + esc(s.name) + '</span><span>' + n(b - a, 1) + ' km · +' + n(up) + ' / −' + n(dn) + ' m</span>' +
         (t0 !== null ? '<em>' + hmin(t0) + ' → ' + hmin(t1) + ' · ' + clockAdd(R.start_time, t1) + '</em>' : '') + '</div>'; }).join('') + '</div>' : '';
-    var tl = '<h3 class="pf-h">Gels &amp; hydratation</h3>' + (md.total ? '<div class="card rp-tl">' + ev.map(function (e) {
-      return '<div class="rp-ev k-' + e.kind + (e.caf ? ' caf' : '') + '"><span class="t">' + hmin(e.t) + '<small>' + clockAdd(R.start_time, e.t) + '</small></span><span class="km">km ' + n(e.km, 1) + '</span><span class="tx"><b>' + esc(e.txt) + '</b>' + (e.sub ? '<small>' + esc(e.sub) + '</small>' : '') + '</span></div>'; }).join('') +
+    var gl = ev.filter(function (e) { return e.kind === 'gel'; }), gT = gl.reduce(function (a, e) { return a + e.g; }, 0), mT = gl.reduce(function (a, e) { return a + (e.mg || 0); }, 0), GP = gelPlan(R);
+    var fsum = md.total && gl.length ? '<div class="card pad rp-fs"><div><b>' + gl.length + ' gels</b><small>' + (GP ? GP.gold + ' Gold · ' + Math.min(GP.kiwi, Math.max(0, gl.length - GP.gold)) + ' Kiwi' + (gl.length > GP.gold + GP.kiwi ? ' · ' + (gl.length - GP.gold - GP.kiwi) + ' ravito' : '') : '1 toutes les ' + (gl[1] ? gl[1].t - gl[0].t : 20) + ' min') + '</small></div>' +
+      '<div><b>' + n(gT / md.total * 60) + ' g/h</b><small>' + n(gT) + ' g G au total</small></div><div><b>' + n(mT) + ' mg</b><small>caféine · demi-vie 5 h</small></div></div>' +
+      '<div class="card rp-fuel"><canvas id="rp-fuel"></canvas></div>' : '';
+    var tl = '<h3 class="pf-h">Gels &amp; hydratation</h3>' + fsum + (md.total ? '<div class="card rp-tl">' + ev.map(function (e) {
+      return '<div class="rp-ev k-' + e.kind + (e.caf ? ' caf' : '') + (e.rav ? ' rav' : '') + '"><span class="t">' + hmin(e.t) + '<small>' + clockAdd(R.start_time, e.t) + '</small></span><span class="km">km ' + n(e.km, 1) + '</span><span class="tx"><b>' + esc(e.txt) + '</b>' + (e.sub ? '<small>' + esc(e.sub) + '</small>' : '') + '</span></div>'; }).join('') +
       '</div><div class="sub">Heures estimées pour l\'objectif ' + esc(String(R.target_time).replace(/:00$/, '')) + ' (effort = km + D+/100).' + (R.fueling ? ' ' + esc(R.fueling) : '') + '</div>' : '<div class="card pad">Pas d\'objectif de temps : ajoute target_time.</div>');
     var wx = '<h3 class="pf-h">Météo</h3>';
     if (W.hours && W.hours.length) {
@@ -1412,6 +1445,7 @@
     $('#view').innerHTML = head + src + prof + segs + tl + wx;
     $('#rp-back').onclick = function (e) { e.preventDefault(); go('graph'); };
     if (C) drawRaceProfile(d, md, ev);
+    if (md.total) drawFuelChart(d, md, ev);
   }
   function drawRaceProfile(d, md, ev) {
     var C = d.course, P = C.points, sc = md.scale; chartDefaults();
