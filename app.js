@@ -1407,7 +1407,8 @@
   function saltEvents(d, md) {
     var T = md.total, out = []; if (!T) return out;
     for (var h = 0; h * 60 < T - 10; h++) {
-      var tp = raceTempAt(d, h * 60 + 30), k = saltPerH(tp); if (!k) continue;
+      var tp = raceTempAt(d, h * 60 + 30), k = saltPerH(tp);
+      if (!k) { out.push({ t: h * 60 + 30, km: md.kmAt(h * 60 + 30), kind: 'salt', zero: true, txt: 'SaltStick : 0 caps', sub: k === 0 ? n(tp, 0) + ' °C prévus (< 20 °C) · 1 caps dès 20 °C' : 'météo inconnue · 1 caps/h si 20–25 °C, 2 au-dessus', na: 0 }); continue; }
       (k === 2 ? [15, 45] : [30]).forEach(function (m) { var t = h * 60 + m; if (t < T - 5) out.push({ t: t, km: md.kmAt(t), kind: 'salt', txt: 'SaltStick (' + SALT_NA + ' mg Na)', sub: 'avec de l\'eau · ' + n(tp, 0) + ' °C prévus', na: SALT_NA }); });
     }
     return out;
@@ -1456,7 +1457,7 @@
       for (var k = 1; k < pp.length; k++) { var dz = pp[k][2] - pp[k - 1][2]; if (dz > 0) up += dz; else dn -= dz; }
       return '<div class="rp-sr"><i style="background:' + (i % 2 ? PAL.route : PAL.trail) + '"></i><span class="nm">' + esc(s.name) + '</span><span>' + n(b - a, 1) + ' km · +' + n(up) + ' / −' + n(dn) + ' m</span>' +
         (t0 !== null ? '<em>' + hmin(t0) + ' → ' + hmin(t1) + ' · ' + clockAdd(R.start_time, t1) + '</em>' : '') + '</div>'; }).join('') + '</div>' : '';
-    var gl = ev.filter(function (e) { return e.kind === 'gel'; }), gT = gl.reduce(function (a, e) { return a + e.g; }, 0), mT = gl.reduce(function (a, e) { return a + (e.mg || 0); }, 0), GP = gelPlan(R), naT = ev.reduce(function (a, e) { return a + (e.na || 0); }, 0), nSalt = ev.filter(function (e) { return e.kind === 'salt'; }).length;
+    var gl = ev.filter(function (e) { return e.kind === 'gel'; }), gT = gl.reduce(function (a, e) { return a + e.g; }, 0), mT = gl.reduce(function (a, e) { return a + (e.mg || 0); }, 0), GP = gelPlan(R), naT = ev.reduce(function (a, e) { return a + (e.na || 0); }, 0), nSalt = ev.filter(function (e) { return e.kind === 'salt' && !e.zero; }).length;
     var fsum = md.total && gl.length ? '<div class="card pad rp-fs"><div><b>' + gl.length + ' gels</b><small>' + (GP ? GP.gold + ' Gold · ' + Math.min(GP.kiwi, Math.max(0, gl.length - GP.gold)) + ' Kiwi' + (gl.length > GP.gold + GP.kiwi ? ' · ' + (gl.length - GP.gold - GP.kiwi) + ' ravito' : '') : '1 toutes les ' + (gl[1] ? gl[1].t - gl[0].t : 20) + ' min') + '</small></div>' +
       '<div><b>' + n(gT / md.total * 60) + ' g/h</b><small>' + n(gT) + ' g G au total</small></div><div><b>' + n(mT) + ' mg</b><small>caféine · demi-vie 5 h</small></div>' +
       '<div><b>' + n(naT / md.total * 60) + ' mg/h</b><small>sodium · ' + n(naT) + ' mg' + (R.water_ml_h && R.sodium_mg_l ? ' (cible ' + n(R.water_ml_h * R.sodium_mg_l / 1000) + '/h)' : '') + '</small></div>' +
@@ -1465,7 +1466,7 @@
       '<div class="sub rp-salt">SaltStick selon la température de chaque heure : 0 caps/h sous 20 °C · 1 de 20 à 25 °C · 2 au-dessus (plan nutrition).' + (nSalt ? '' : ' Météo prévue sous 20 °C : aucune capsule, le sodium vient des gels.') + '</div>' +
       '<div class="card rp-fuel"><canvas id="rp-fuel"></canvas></div>' : '';
     var tl = '<h3 class="pf-h">Gels &amp; hydratation</h3>' + fsum + (md.total ? '<div class="card rp-tl">' + ev.map(function (e) {
-      return '<div class="rp-ev k-' + e.kind + (e.caf ? ' caf' : '') + (e.rav ? ' rav' : '') + '"><span class="t">' + hmin(e.t) + '<small>' + clockAdd(R.start_time, e.t) + '</small></span><span class="km">km ' + n(e.km, 1) + '</span><span class="tx"><b>' + esc(e.txt) + '</b>' + (e.sub ? '<small>' + esc(e.sub) + '</small>' : '') + '</span></div>'; }).join('') +
+      return '<div class="rp-ev k-' + e.kind + (e.caf ? ' caf' : '') + (e.rav ? ' rav' : '') + (e.zero ? ' zero' : '') + '"><span class="t">' + hmin(e.t) + '<small>' + clockAdd(R.start_time, e.t) + '</small></span><span class="km">km ' + n(e.km, 1) + '</span><span class="tx"><b>' + esc(e.txt) + '</b>' + (e.sub ? '<small>' + esc(e.sub) + '</small>' : '') + '</span></div>'; }).join('') +
       '</div><div class="sub">Heures estimées pour l\'objectif ' + esc(String(R.target_time).replace(/:00$/, '')) + ' (effort = km + D+/100).' + (R.fueling ? ' ' + esc(R.fueling) : '') + '</div>' : '<div class="card pad">Pas d\'objectif de temps : ajoute target_time.</div>');
     var wx = '<h3 class="pf-h">Météo</h3>';
     if (W.hours && W.hours.length) {
