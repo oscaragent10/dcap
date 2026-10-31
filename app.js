@@ -1381,11 +1381,11 @@
     var GP = gelPlan(R), gG = Math.round(+R.gel_g || 24);
     gels.forEach(function (t, i) {
       var c, sub = '', mg = 0;
-      if (GP) { var k = i < GP.gold ? 'gold' : i < GP.gold + GP.kiwi ? 'kiwi' : 'ravito'; c = k === 'kiwi'; mg = c ? GP.mg : 0;
-        sub = k === 'gold' ? 'Honey Stinger Gold · sans caféine' : k === 'kiwi' ? 'Kiwi fraise · ' + GP.mg + ' mg caféine' : 'Kiwi max atteint · glucides au ravito'; }
+      var GK = GP ? GEL_KIND[GP.order[i] || 'R'] : null;
+      if (GK) { c = GK.caf; mg = c ? GP.mg : 0; sub = GP.order[i] ? (c ? 'Kiwi fraise · ' + GP.mg + ' mg caféine' : GK.sub) : 'hors plan · glucides au ravito'; }
       else { c = cafTimes.length ? cafTimes.some(function (x) { return Math.abs(x - t) <= every / 2; }) : (cafHalf && t >= T / 2 && i % 2 === 0); mg = c ? cafMg(R) : 0; }
-      var na = GP && sub.indexOf('ravito') < 0 ? (c ? 50 : 45) : 0;
-      ev.push({ na: na, t: t, km: md.kmAt(t), kind: 'gel', txt: 'Gel ' + (i + 1) + ' (' + gG + ' g G)' + (!GP && c ? ' · caféiné' : ''), sub: sub, caf: c, g: gG, mg: mg, rav: GP && sub.indexOf('ravito') > 0 });
+      var na = GK && GP.order[i] ? GK.na : 0;
+      ev.push({ na: na, t: t, km: md.kmAt(t), kind: 'gel', txt: 'Gel ' + (i + 1) + ' (' + gG + ' g G)' + (!GP && c ? ' · caféiné' : ''), sub: sub, caf: c, g: gG, mg: mg, rav: !!(GK && (GK.rav || !GP.order[i])) });
     });
     var water = +R.water_ml_h || 0, sod = +R.sodium_mg_l || 0, aid = (C && C.aid) || [], scale = md.scale, stops = [0].concat(aid.map(function (a) { return a.km * scale; })).concat([md.dist]);
     for (var i = 0; i < stops.length - 1; i++) {
@@ -1413,11 +1413,15 @@
     }
     return out;
   }
-  /** v91 : marques des gels lues sur la fiche course (« 3 Honey Stinger Gold puis Kiwi fraise caféinés (32 mg, 10 max) »). */
-  function gelPlan(R) {
-    var f = String(R.fueling || '') + ' ' + String(R.caffeine || ''), g = /(\d+)\s*(?:Honey Stinger\s*)?Gold/i.exec(f), k = /Kiwi[^.;]*?(\d+)\s*max/i.exec(f), mg = /(\d+)\s*mg/i.exec(String(R.caffeine || '')) || /Kiwi[^.;]*?(\d+)\s*mg/i.exec(f);
-    return g && k ? { gold: +g[1], kiwi: +k[1], mg: mg ? +mg[1] : 32 } : null;
+  /** v94 : ordre des gels = champ structuré Races.gel_order, seule source (« G,G,G,Kx10,G,G » ; G = Gold, K = Kiwi fraise caféiné, R = ravito).
+   *  Plus aucune lecture de nombres dans le texte fueling (v91 y lisait « 5 Gold » du stock). */
+  var GEL_KIND = { G: { sub: 'Honey Stinger Gold · sans caféine', na: 45, caf: false }, K: { sub: 'Kiwi fraise · caféiné', na: 50, caf: true }, R: { sub: 'glucides au ravito', na: 0, caf: false, rav: true } };
+  function gelOrder(R) {
+    var raw = String(R.gel_order || '').toUpperCase().replace(/\s/g, ''); if (!raw) return null;
+    var out = []; raw.split(/[,;]/).forEach(function (t) { var m = /^([GKR])(?:[X×*](\d+))?$/.exec(t); if (!m) return; for (var k = 0; k < (m[2] ? +m[2] : 1); k++) out.push(m[1]); });
+    return out.length ? out : null;
   }
+  function gelPlan(R) { var o = gelOrder(R); return o ? { order: o, gold: o.filter(function (x) { return x === 'G'; }).length, kiwi: o.filter(function (x) { return x === 'K'; }).length, rav: o.filter(function (x) { return x === 'R'; }).length, mg: cafMg(R) } : null; }
   /** v91 : glucides par heure (barres) + caféine dans le corps (demi-vie 5 h, somme des prises). */
   function drawFuelChart(d, md, ev) {
     var el = document.getElementById('rp-fuel'); if (!el) return;
@@ -1458,7 +1462,7 @@
       return '<div class="rp-sr"><i style="background:' + (i % 2 ? PAL.route : PAL.trail) + '"></i><span class="nm">' + esc(s.name) + '</span><span>' + n(b - a, 1) + ' km · +' + n(up) + ' / −' + n(dn) + ' m</span>' +
         (t0 !== null ? '<em>' + hmin(t0) + ' → ' + hmin(t1) + ' · ' + clockAdd(R.start_time, t1) + '</em>' : '') + '</div>'; }).join('') + '</div>' : '';
     var gl = ev.filter(function (e) { return e.kind === 'gel'; }), gT = gl.reduce(function (a, e) { return a + e.g; }, 0), mT = gl.reduce(function (a, e) { return a + (e.mg || 0); }, 0), GP = gelPlan(R), naT = ev.reduce(function (a, e) { return a + (e.na || 0); }, 0), nSalt = ev.filter(function (e) { return e.kind === 'salt' && !e.zero; }).length;
-    var fsum = md.total && gl.length ? '<div class="card pad rp-fs"><div><b>' + gl.length + ' gels</b><small>' + (GP ? GP.gold + ' Gold · ' + Math.min(GP.kiwi, Math.max(0, gl.length - GP.gold)) + ' Kiwi' + (gl.length > GP.gold + GP.kiwi ? ' · ' + (gl.length - GP.gold - GP.kiwi) + ' ravito' : '') : '1 toutes les ' + (gl[1] ? gl[1].t - gl[0].t : 20) + ' min') + '</small></div>' +
+    var fsum = md.total && gl.length ? '<div class="card pad rp-fs"><div><b>' + gl.length + ' gels</b><small>' + (GP ? (function () { var o = GP.order.slice(0, gl.length), g = o.filter(function (x) { return x === 'G'; }).length, k = o.filter(function (x) { return x === 'K'; }).length, r = gl.length - g - k; return g + ' Gold · ' + k + ' Kiwi' + (r ? ' · ' + r + ' ravito' : ''); })() : '1 toutes les ' + (gl[1] ? gl[1].t - gl[0].t : 20) + ' min') + '</small></div>' +
       '<div><b>' + n(gT / md.total * 60) + ' g/h</b><small>' + n(gT) + ' g G au total</small></div><div><b>' + n(mT) + ' mg</b><small>caféine · demi-vie 5 h</small></div>' +
       '<div><b>' + n(naT / md.total * 60) + ' mg/h</b><small>sodium · ' + n(naT) + ' mg' + (R.water_ml_h && R.sodium_mg_l ? ' (cible ' + n(R.water_ml_h * R.sodium_mg_l / 1000) + '/h)' : '') + '</small></div>' +
       '<div><b>' + nSalt + ' SaltStick</b><small>' + SALT_NA + ' mg Na/caps</small></div>' +
