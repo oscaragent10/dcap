@@ -325,7 +325,7 @@
     if (d.alerts.length) h += '<div class="alerts">' + d.alerts.filter(function (a) { return !/^ACWR/.test(a.text) || a.level === 'danger'; }).map(function (a) { return '<div class="alert ' + a.level + '">⚠ <span>' + esc(a.text) + '</span></div>'; }).join('') + '</div>';
     // 2. Programme : jour par jour, prévu (agenda) + réalisé ; course et muscu mêlées dans l'ordre chronologique
     h += '<div class="sec"><h2><span class="n">2.</span>Programme</h2><div class="right">' +
-      (d.pending_proposals ? '<button class="btn btn-blue btn-sm" id="open-props">' + d.pending_proposals + ' proposition(s)</button>' : '') + '</div></div>';
+      (d.pending_proposals ? '<button class="btn btn-blue btn-sm" id="open-props">' + d.pending_proposals + ' proposition' + (d.pending_proposals > 1 ? 's' : '') + ' à valider</button>' : '') + '</div></div>';
     h += '<div class="prog card">';
     d.days.forEach(function (day) {
       var di = dowIdx(day.date), past = day.date < d.today, pairs = pairDay(day);
@@ -357,7 +357,7 @@
     bindCommon(d.days.reduce(function (acc, x) { return acc.concat(x.plans, x.gym); }, []));
     $$('.prow[role=button]').forEach(function (el) { el.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } }; });
     bindRaceLinks(); // v91 : course → Plan de course
-    var op = $('#open-props'); if (op) op.onclick = function () { Chat.open(); };
+    var op = $('#open-props'); if (op) op.onclick = function () { Chat.focusProps(); };
     hideSplash();
   }
 
@@ -1926,11 +1926,22 @@
     // seulement si l'on est « collé ». On ne se décolle que si le DOIGT / la molette remonte. Aucun timer, aucun smooth.
     var sc = $('#chat-sc'), REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)');
     function nearBottom(th) { return sc.scrollHeight - sc.scrollTop - sc.clientHeight < (th || 70); }
-    function stickNow() { if (C.isOpen && C.stick) sc.scrollTop = sc.scrollHeight; }
+    function stickNow() { if (focusing()) return; if (C.isOpen && C.stick) sc.scrollTop = sc.scrollHeight; }
     function toEnd(smooth) {
+      if (focusing()) return;
       if (!C.isOpen) return;
       C.stick = true; C.unseen = false; setPill();
       if (smooth && !(REDUCED && REDUCED.matches)) sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' }); else sc.scrollTop = sc.scrollHeight;
+    }
+    // v95 : bouton « N proposition(s) » → Coach ouvert ET carte en attente centrée (le fil collait au bas, la carte du 31/10 restait enfouie)
+    function focusing() { return C.focus && Date.now() - C.focus < 6000; }
+    function focusProps() {
+      open(); C.focus = Date.now(); C.stick = false; var n = 0;
+      (function tryIt() {
+        var el = box.querySelector('.pc.pending');
+        if (el) { el.scrollIntoView({ block: 'center' }); $$('.pc.pending', box).forEach(function (c) { c.classList.remove('pc-flash'); void c.offsetWidth; c.classList.add('pc-flash'); }); }
+        if (++n < 14 && focusing()) setTimeout(tryIt, 400); else if (!el) { C.focus = 0; toEnd(false); toast('Aucune proposition en attente'); }
+      })();
     }
     function hardEnd() { stickNow(); }      // compat : anciens appels v77–v81, désormais un simple recalage
     function pin() { C.stick = true; }
@@ -1953,6 +1964,7 @@
     sc.addEventListener('scroll', function () {
       var t = sc.scrollTop, up = t < lastTop - 1; lastTop = t;
       if (nearBottom()) { if (!C.stick || C.unseen) { C.stick = true; C.unseen = false; setPill(); } }
+      if (up && userBusy() && C.focus && Date.now() - C.focus > 800) C.focus = 0; // Paul défile : on rend la main
       else if (up && userBusy() && C.stick) { C.stick = false; setPill(); } // décroché seulement par Paul
     }, { passive: true });
     sc.addEventListener('touchstart', function () { C.touching = true; C.userAt = Date.now(); }, { passive: true });
@@ -2195,6 +2207,7 @@
       C.just = null;
     }
     function decide(id, dec, btn) {
+      C.focus = 0;
       $$('[data-ok="' + id + '"],[data-no="' + id + '"]', box).forEach(function (b) { b.disabled = true; });
       btn.textContent = dec === 'accept' ? 'Validation…' : 'Refus…';
       call('uiDecide', id, dec).then(function (r) {
@@ -2355,7 +2368,7 @@
       grip.addEventListener('dblclick', function () { setSize(null, null, true); });
       window.addEventListener('resize', function () { if (!MOBILE.matches && chatEl.style.getPropertyValue('--cw')) { var r = chatEl.getBoundingClientRect(); setSize(r.width, r.height, false); } });
     })();
-    return { open: open, close: close, load: load };
+    return { open: open, close: close, load: load, focusProps: focusProps };
   })();
 
   // ------------------------------------------------------------------ démarrage
