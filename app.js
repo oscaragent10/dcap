@@ -354,7 +354,7 @@
     $('#view').innerHTML = h;
     if (keepScroll) window.scrollTo(0, y);
     $$('[data-wk]').forEach(function (b) { b.onclick = function () { var k = +b.getAttribute('data-wk'); go('week', { day: k ? addDays(d.monday, k) : null }); }; });
-    bindCommon(d.days.reduce(function (acc, x) { return acc.concat(x.plans, x.gym); }, []));
+    bindCommon(d.days.reduce(function (acc, x) { return acc.concat(x.plans, x.gym); }, []), d.days.reduce(function (acc, x) { return acc.concat(x.acts || []); }, []));
     $$('.prow[role=button]').forEach(function (el) { el.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); } }; });
     bindRaceLinks(); // v91 : course → Plan de course
     var op = $('#open-props'); if (op) op.onclick = function () { Chat.focusProps(); };
@@ -362,9 +362,10 @@
   }
 
   /** Clics communs : boutons Description (modale) et ouverture d'une sortie. */
-  function bindCommon(plans) {
+  function bindCommon(plans, acts) {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) window.__pd = function (id) { var p = plans.filter(function (x) { return x && x.plan_id === id; })[0]; if (p) showPlan(p, (acts || []).filter(function (a) { return p.linked_activity_id && String(a.activity_id) === String(p.linked_activity_id); })[0]); return !!p; }; // aperçu local (tests) uniquement
     $$('[data-gym]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); go('gym', { plan_id: b.getAttribute('data-gym') }); }; });
-    $$('[data-desc]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); var p = plans.filter(function (x) { return x.plan_id === b.getAttribute('data-desc'); })[0]; if (p) showPlan(p); }; });
+    $$('[data-desc]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); var p = plans.filter(function (x) { return x.plan_id === b.getAttribute('data-desc'); })[0]; if (p) showPlan(p, p.linked_activity_id ? (acts || []).filter(function (a) { return String(a.activity_id) === String(p.linked_activity_id); })[0] : null); }; });
     $$('[data-act]').forEach(function (b) { b.onclick = function (e) { e.stopPropagation(); go('detail', { id: b.getAttribute('data-act') }); }; });
   }
 
@@ -404,23 +405,47 @@
     if (list) out.push('<ul>' + list.join('') + '</ul>');
     return out.join('').replace(/(<p><\/p>)+/g, '');
   }
-  function showPlan(p) {
-    var rows = [['Date', dayLabel(p.date) + (p.start_time ? ' · ' + p.start_time : '')], ['Type', p.type === 'muscu' ? 'Muscu' : p.type], ['Distance', kmRange(p)], ['Durée', p.duration_min ? hm(p.duration_min * 60) : ''],
-      ['Allure', p.pace_target],
-      ['D+ cible', p.d_plus_target_m ? p.d_plus_target_m + ' m' : ''], ['Lieu', p.lieu], ['Structure', p.structure], ['FC cible', p.hr_target ? p.hr_target + (/bpm/.test(p.hr_target) ? '' : ' bpm') : ''],
-      ['Nutrition', p.fueling], ['Statut', statusLbl(p.status)], ['Source', p.source === 'calendar' ? 'Google Agenda' : p.source === 'proposal' ? 'validée via le coach' : '']];
-    var h = '<div class="sec" style="margin-top:0"><h2>' + esc(p.title || p.type) + '</h2><button class="btn btn-ghost btn-sm" id="m-close">✕</button></div><dl class="kv">' +
-      rows.filter(function (r) { return r[1]; }).map(function (r) { return '<dt>' + r[0] + '</dt><dd class="' + (r[0] === 'Structure' || r[0] === 'FC cible' ? 'code' : '') + '">' + esc(r[1]) + '</dd>'; }).join('') + '</dl>' +
-      (p.description ? '<div class="panel"><div class="ttl">Description</div><div class="pdesc">' + richDesc(p.description) + '</div></div>' : '<div class="muted">Pas de description.</div>') +
-      '<div class="row" style="margin-top:14px;justify-content:flex-end">' +
-      (p.linked_activity_id ? '<button class="btn btn-ghost" id="m-act">Voir la sortie</button>' : '') +
-      (p.type === 'muscu' ? '<button class="btn" id="m-gym">Ouvrir la séance</button>' : '') +
-      '<button class="btn btn-green" id="m-ask">Demander au coach</button></div>';
-    $('#modal-box').innerHTML = h; $('#modal').classList.remove('closing'); $('#modal').classList.add('open');
+  // v96 : fiche séance compacte — puces (date · type · statut), 4 tuiles dédupliquées (champ structuré prioritaire,
+  // sinon ligne « Allure : » etc. de la description), description sans les lignes reprises, nutrition, « Réalisé » si sortie liée,
+  // bouton « Demander au coach » collé en bas. Rien n'est modifié dans les données.
+  var PD_RX = { fuel: /^nutrition\s*:\s*(.+)$/i, dist: /^distance\s*:\s*(.+)$/i, pace: /^allure\s*:\s*(.+)$/i, hr: /^(?:fc|fc cible)\s*:\s*(.+)$/i };
+  function planParts(p) {
+    var got = {}, keep = [];
+    String(p.description || '').split(/\n/).forEach(function (l) {
+      var t = l.trim(), hit = null;
+      Object.keys(PD_RX).forEach(function (k) { var m = !hit && PD_RX[k].exec(t); if (m) hit = [k, m[1]]; });
+      if (hit) { if (!got[hit[0]]) got[hit[0]] = hit[1]; } else keep.push(l);
+    });
+    return { got: got, prose: keep.join('\n').replace(/\n{3,}/g, '\n\n').trim() };
+  }
+  function planSp(t) { return t === 'muscu' ? 'muscu' : t === 'course' ? 'race' : /trail/i.test(t || '') ? 'trail' : /marche|autre|récup|recup|natation|velo/i.test(t || '') ? 'autre' : 'route'; }
+  function showPlan(p, act) {
+    var X = planParts(p), g = X.got, sp = planSp(p.type), gym = p.type === 'muscu';
+    var dist = kmRange(p) || (g.dist ? String(g.dist).replace(/\s*km\b/i, ' km') : '');
+    var pc = p.pace_target ? String(p.pace_target).replace(/\s*\/\s*km$/, '') + '/km' : g.pace ? String(g.pace).replace(/\s*(?:min\s*)?\/\s*km$/i, '') + '/km' : '';
+    var hr = p.hr_target ? String(p.hr_target).replace(/\s*bpm/, '') : g.hr ? String(g.hr) : '';
+    var tile = function (l, v, cls) { return v ? '<div class="pd-t' + (cls ? ' ' + cls : '') + '"><span class="pd-tl">' + l + '</span><span class="pd-tv">' + v + '</span></div>' : ''; };
+    var big = function (v) { var m = /^(.*?)(\s?(?:km|\/km|bpm|m))$/.exec(v); return m ? esc(m[1]) + '<small>' + esc(m[2].trim()) + '</small>' : esc(v); };
+    var tiles = (gym ? [tile('Durée', p.duration_min ? esc(hm(p.duration_min * 60)) : ''), tile('Structure', p.structure ? esc(p.structure) : '', 'txt'), tile('Lieu', p.lieu ? esc(p.lieu) : '', 'txt')]
+      : [tile('Distance', dist ? big(dist) : (p.duration_min ? esc(hm(p.duration_min * 60)) : '')), tile('Allure', pc ? big(pc) : ''), tile('FC cible', hr ? big(hr + (/sous|<|max/i.test(hr) ? '' : ' bpm')) : ''),
+         tile(p.d_plus_target_m && !p.lieu ? 'D+ cible' : 'Lieu', p.lieu ? esc(p.lieu) : p.d_plus_target_m ? big(p.d_plus_target_m + ' m') : '', p.lieu ? 'txt' : '')]).join('');
+    var st = p.status || 'planned';
+    var chips = '<span class="pd-c">' + esc(dayLabel(p.date)) + (p.start_time ? ' · ' + esc(p.start_time) : '') + '</span><span class="pd-c pd-ty sp-' + sp + '">' + esc(gym ? 'Muscu' : p.type || '') + '</span>' +
+      '<span class="pd-c pd-st st-' + esc(st) + '">' + esc(statusLbl(st)) + '</span>' + (p.source === 'proposal' ? '<span class="pd-c pd-src">via coach</span>' : p.source === 'calendar' ? '<span class="pd-c pd-src">Agenda</span>' : '');
+    var done = act ? '<div class="pd-done"><span class="pd-tl">Réalisé</span><span><b>' + n(act.distance_km, 1) + '</b> km' + (dist ? ' <i>/ ' + esc(dist) + '</i>' : '') + '</span><span><b>' + pace(act.avg_pace_s_km) + '</b>/km</span>' +
+      (act.avg_hr ? '<span>FC <b>' + act.avg_hr + '</b></span>' : '') + '<button class="lnk" id="m-act">Voir ›</button></div>' : (p.linked_activity_id ? '<div class="pd-done"><span class="pd-tl">Réalisé</span><span>sortie liée</span><button class="lnk" id="m-act">Voir ›</button></div>' : '');
+    var h = '<div class="pd"><div class="pd-head"><h2>' + esc(p.title || p.type) + '</h2><button class="pd-x" id="m-close" aria-label="Fermer">✕</button></div>' +
+      '<div class="pd-chips">' + chips + '</div>' + done + (tiles ? '<div class="pd-grid">' + tiles + '</div>' : '') +
+      (X.prose ? '<div class="pdesc pd-desc">' + richDesc(X.prose) + '</div>' : '') +
+      (p.fueling || g.fuel ? '<div class="pd-fuel"><span aria-hidden="true">◆</span> ' + esc(p.fueling || g.fuel) + '</div>' : '') +
+      '<div class="pd-foot">' + (gym ? '<button class="btn" id="m-gym">Ouvrir la séance</button>' : '') + (p.type === 'course' ? '<button class="btn" id="m-race">Plan de course</button>' : '') +
+      '<button class="btn btn-green" id="m-ask">Demander au coach</button></div></div>';
+    $('#modal-box').innerHTML = h; $('#modal-box').scrollTop = 0; $('#modal').classList.remove('closing'); $('#modal').classList.add('open');
     $('#m-close').onclick = closeModal;
     $('#m-ask').onclick = function () { closeModal(); Chat.open('séance ' + p.plan_id + ' · ' + p.type + ' du ' + p.date + ' « ' + (p.title || '') + ' »'); };
     var mg = $('#m-gym'); if (mg) mg.onclick = function () { closeModal(); go('gym', { plan_id: p.plan_id }); };
-    var ma = $('#m-act'); if (ma) ma.onclick = function () { closeModal(); go('detail', { id: String(p.linked_activity_id) }); };
+    var mr = $('#m-race'); if (mr) mr.onclick = function () { closeModal(); go('race'); };
+    var ma = $('#m-act'); if (ma) ma.onclick = function () { closeModal(); go('detail', { id: String(act ? act.activity_id : p.linked_activity_id) }); };
   }
   function closeModal() { // v78 : la feuille redescend (250 ms) avant de disparaître
     var m = $('#modal'); if (!m.classList.contains('open')) return;

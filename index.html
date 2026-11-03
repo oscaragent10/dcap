@@ -1077,6 +1077,22 @@ body.ge-open{overflow:hidden}
 .rp-ev.k-salt.zero .tx b:before{background:transparent;border:1.5px solid #2F6DB5}
 /* v95 */
 .pc.pc-flash{animation:pcf 1.6s ease-out 2}@keyframes pcf{0%{box-shadow:0 0 0 0 rgba(37,99,235,.55)}100%{box-shadow:0 0 0 12px rgba(37,99,235,0)}}
+/* v96 fiche séance */
+.pd{display:flex;flex-direction:column;gap:12px;min-height:0}
+.pd-head{display:flex;align-items:flex-start;gap:10px}.pd-head h2{flex:1;margin:0;font-family:var(--head);font-weight:800;font-size:24px;line-height:1.05;text-transform:uppercase;letter-spacing:.01em}
+.pd-x{flex:none;width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:15px;color:var(--ink);cursor:pointer}
+.pd-chips{display:flex;flex-wrap:wrap;gap:6px}.pd-c{font-family:var(--mono);font-size:11.5px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink-2);white-space:nowrap}
+.pd-ty{background:var(--c);border-color:var(--c);color:#fff;font-weight:600;text-transform:uppercase;letter-spacing:.05em}.pd-ty.sp-muscu,.pd-ty.sp-race{color:var(--ink)}
+.pd-st.st-done{background:#E6F5EC;border-color:var(--c-trail);color:var(--c-trail-d)}.pd-st.st-missed{color:#B4432F;border-color:#E3B2A6}.pd-src{color:var(--muted)}
+.pd-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pd-t{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;min-height:58px;display:flex;flex-direction:column;justify-content:space-between}
+.pd-tl{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.pd-tv{font-family:var(--head);font-weight:800;font-size:24px;line-height:1.05}.pd-tv small{font-size:13px;color:var(--muted);font-weight:700;margin-left:2px}.pd-t.txt .pd-tv{font-size:16px;line-height:1.2}
+.pd-desc{background:var(--parchment-2);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px}
+.pd-fuel{font-size:12.5px;color:var(--ink-2)}.pd-fuel span{color:var(--gold-d)}
+.pd-done{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-family:var(--mono);font-size:12.5px;background:#E6F5EC;border:1px solid #B9E2C8;border-radius:var(--radius);padding:8px 10px}
+.pd-done b{font-family:var(--head);font-size:18px}.pd-done i{color:var(--muted);font-style:normal}.pd-done .lnk{margin-left:auto}
+.pd-foot{position:sticky;bottom:-18px;margin:4px -18px -18px;padding:10px 18px calc(12px + env(safe-area-inset-bottom));background:var(--parchment);border-top:1px solid var(--line);display:flex;gap:8px}.pd-foot .btn{flex:1}
+@media (max-width:760px){.pd-foot{bottom:calc(-18px - max(env(safe-area-inset-bottom),var(--sab)));margin:4px -16px calc(-18px - max(env(safe-area-inset-bottom),var(--sab)));padding:10px 16px calc(12px + max(env(safe-area-inset-bottom),var(--sab)))}}
 </style>
 
 </head>
@@ -1153,17 +1169,17 @@ body.ge-open{overflow:hidden}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '95-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '96-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=95-p7"></script>
-  <script src="bridge.js?b=95-p7"></script>
-  <script src="updater.js?b=95-p7"></script>
+  <script src="api.js?b=96-p7"></script>
+  <script src="bridge.js?b=96-p7"></script>
+  <script src="updater.js?b=96-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=95-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=96-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur
