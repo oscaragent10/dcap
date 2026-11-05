@@ -1734,12 +1734,12 @@
     h += '<div class="panel"><div class="ttl">' + (d.debrief.from_coach ? 'Debrief coach' : d.debrief.auto ? 'Résumé auto · en attente du debrief coach' : 'Notes') + '</div><div class="debrief cmd">' +
       (mdRender ? mdRender(String(d.debrief.text).replace(/^\[Coach\]\s*/, '')) : esc(String(d.debrief.text).replace(/^\[Coach\]\s*/, ''))) + '</div></div></div>';
     // Splits
-    h += '<div class="spl"><div class="sec"><h2><span class="n">≡</span>Splits</h2></div><div class="card" style="overflow-x:auto"><table class="tbl"><thead><tr><th>Km</th><th class="opt-m">Temps</th><th>Allure</th><th>GAP</th><th>FC</th><th>D+</th><th class="opt">D-</th><th class="opt">Pente</th></tr></thead><tbody>';
+    h += '<div class="spl"><div class="sec"><h2><span class="n">≡</span>Splits</h2></div><div class="card" style="overflow-x:auto"><table class="tbl"><thead><tr><th>Km</th><th class="opt-m">Temps</th><th>Allure</th><th>GAP</th><th>FC</th><th>D+</th><th>D-</th><th class="opt">Pente</th></tr></thead><tbody>';
     var paces = sp.map(function (s) { return +s.pace_s_km; }), pmin = Math.min.apply(null, paces), pmax = Math.max.apply(null, paces);
     sp.forEach(function (s) {
       var w = pmax > pmin ? 30 + 70 * (pmax - s.pace_s_km) / (pmax - pmin) : 60;
       h += '<tr><td>' + s.km + (s.km === sp.length && a.distance_km % 1 > 0.005 ? ' <span class="muted">(' + n((a.distance_km % 1), 2) + ')</span>' : '') + '</td><td class="opt-m">' + dur(s.time_s) + '</td><td class="pace-cell"><b>' + pace(s.pace_s_km) + '</b><i style="width:' + Math.round(w * 0.42) + '%"></i></td><td>' + pace(s.gap_s_km) +
-        '</td><td>' + n(s.avg_hr) + '</td><td style="color:#2E9A55">' + (+s.d_plus_m ? '+' + n(s.d_plus_m) : '0') + '</td><td class="opt">' + (+s.d_minus_m ? '−' + n(s.d_minus_m) : '0') + '</td><td class="opt">' + n(s.avg_grade_pct, 1) + ' %</td></tr>';
+        '</td><td>' + n(s.avg_hr) + '</td><td style="color:#2E9A55">' + (+s.d_plus_m ? '+' + n(s.d_plus_m) : '0') + '</td><td style="color:#C8442F">' + (+s.d_minus_m ? '−' + n(s.d_minus_m) : '0') + '</td><td class="opt">' + n(s.avg_grade_pct, 1) + ' %</td></tr>';
     });
     h += '</tbody></table>' + (sp.length ? '' : '<div class="empty">Pas de splits (activité sans trace GPX).</div>') + '</div></div></div>';
     $('#view').innerHTML = h;

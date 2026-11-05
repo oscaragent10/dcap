@@ -667,8 +667,8 @@ h1,h2,h3{font-family:var(--head);font-weight:800;text-transform:uppercase;letter
   .leaflet-touch .leaflet-control-layers-toggle{width:44px;height:44px}
   .map-legend{font-size:11px}
   .tbl{font-size:13px}
-  .tbl th{font-size:11px;letter-spacing:.06em;padding:8px 6px}
-  .tbl td{padding:9px 6px}
+  .tbl th{font-size:11px;letter-spacing:.04em;padding:8px 4px}
+  .tbl td{padding:9px 4px}
   .tbl .opt,.tbl .opt-m{display:none}
   .debrief{font-size:13.5px}
   /* coach (téléphone) : une PAGE comme les autres, dans le flux sous l'en-tête DCAP (défilement de la fenêtre, pas de
@@ -1169,17 +1169,17 @@ body.ge-open{overflow:hidden}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '96-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '97-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
   </script>
-  <script src="api.js?b=96-p7"></script>
-  <script src="bridge.js?b=96-p7"></script>
-  <script src="updater.js?b=96-p7"></script>
+  <script src="api.js?b=97-p7"></script>
+  <script src="bridge.js?b=97-p7"></script>
+  <script src="updater.js?b=97-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=96-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=97-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started) window.BOOT = d.week || window.BOOT; });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur
