@@ -465,7 +465,7 @@
       lsSet(ck, d);
       if (S.view !== 'gym') return;
       if (!G || G.d.plan_id !== d.plan_id || !G.touched) { gymInit(d); renderGym(); }
-      else { G.d.activity = d.activity; G.d.steps = d.steps; }
+      else { G.d.activity = d.activity; G.d.steps = d.steps; gymMergeIn(d.log ? d.log.exercises : []); }
     }).catch(function (e) { if (!(c && c.data)) fail(e); });
   }
   function gymInit(d) {
@@ -480,7 +480,9 @@
       ex = src.map(gymFromParsed);
     }
     ex.forEach(function (x) { if (x.rpe !== null && x.rpe !== undefined) x.rpeSaved = true; });
-    G = { d: d, ex: ex, note: (draft && draft.note) || (d.log && d.log.note) || '', key: draftKey, finished: d.log && d.log.finished_at, saveSt: d.log ? 'saved' : '', timer: null, inflight: false, dirty: false, prevMap: {} };
+    G = { d: d, ex: ex, note: (draft && draft.note) || (d.log && d.log.note) || '', key: draftKey, finished: d.log && d.log.finished_at, saveSt: d.log ? 'saved' : '', timer: null, inflight: false, dirty: false, prevMap: {},
+      base: (d.log && d.log.updated_at) || '', removed: (draft && draft.removed) || [] };
+    if (draft && draft.ex && d.log) gymMergeIn(d.log.exercises, true); // brouillon local plus récent : on y rajoute quand même les exos ajoutés côté serveur
     d.parsed.exercises.forEach(function (p) { G.prevMap[p.name] = p; });
   }
   function gymTarget(p) {
@@ -494,18 +496,47 @@
     for (var i = 0; i < nSets; i++) sets.push(p.unilateral ? { weight_lbs: w, reps_g: reps, reps_d: reps, status: 'todo' } : { weight_lbs: w, reps: reps, status: 'todo' });
     return { name: p.name, unilateral: !!p.unilateral, rpe: null, note: '', target: gymTarget(p), sets: sets };
   }
+  // v98 : fusion. Un exo présent côté serveur (ajouté par le coach / l'agenda) mais absent de l'écran est ajouté à la fin,
+  // sauf s'il a été retiré ici. Jamais l'inverse : l'écran n'efface rien de ce qui est stocké.
+  function gymExKey(n) { return String(n || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80); }
+  function gymMergeIn(list, silent) {
+    if (!G || !list || !list.length) return [];
+    var have = {}; G.ex.forEach(function (e) { have[gymExKey(e.name)] = 1; }); (G.removed || []).forEach(function (n) { have[gymExKey(n)] = 1; });
+    var add = list.filter(function (e) { var k = gymExKey(e.name); if (have[k]) return false; have[k] = 1; return true; }).map(function (e) {
+      return { name: e.name, unilateral: !!e.unilateral, rpe: e.rpe === null || e.rpe === '' || e.rpe === undefined ? null : +e.rpe, note: e.note || '', target: e.target || '',
+        sets: (e.sets || []).map(function (s) { var f = function (v) { return v === null || v === undefined || v === '' ? null : +v; }; return { weight_lbs: f(s.weight_lbs), weight_d: f(s.weight_d), reps: f(s.reps), reps_g: f(s.reps_g), reps_d: f(s.reps_d), status: s.status === 'done' ? 'done' : 'todo' }; }) }; });
+    if (!add.length) return [];
+    G.ex = G.ex.concat(add);
+    if (!silent && S.view === 'gym' && !document.querySelector('.ge-ov, .ge-open')) { var y = window.scrollY; renderGym(); window.scrollTo(0, y); }
+    if (!silent) toast('Ajouté à ta séance : ' + add.map(function (e) { return e.name; }).join(', '), 4000);
+    return add;
+  }
+  function gymRefresh() {
+    if (!G || S.view !== 'gym' || document.hidden) return;
+    var g = G;
+    call('uiStrength', g.d.plan_id && !/^free-/.test(g.d.plan_id) ? g.d.plan_id : null, g.d.date).then(function (d) {
+      if (G !== g || S.view !== 'gym' || d.plan_id !== g.d.plan_id) return;
+      g.d.activity = d.activity; g.d.parsed = d.parsed;
+      if (gymMergeIn(d.log ? d.log.exercises : d.parsed.exercises.map(gymFromParsed)).length) gymSaveSoon();
+    }).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) gymRefresh(); });
+  setInterval(gymRefresh, 60000);
   function gymSaveSoon(ms) {
     G.dirty = true; G.touched = true; G.saveSt = 'pending'; gymSaveBadge();
-    try { localStorage.setItem(G.key, JSON.stringify({ t: Date.now(), ex: G.ex, note: G.note })); } catch (e) {}
+    try { localStorage.setItem(G.key, JSON.stringify({ t: Date.now(), ex: G.ex, note: G.note, removed: G.removed })); } catch (e) {}
     clearTimeout(G.timer); G.timer = setTimeout(function () { gymSave(false, 0); }, ms === undefined ? 900 : ms);
   }
   function gymSave(finish, attempt) {
     if (!G) return Promise.resolve();
     if (G.inflight && !finish) { clearTimeout(G.timer); G.timer = setTimeout(function () { gymSave(false, 0); }, 700); return Promise.resolve(); }
     var g = G; g.inflight = true; g.dirty = false; g.saveSt = 'saving'; gymSaveBadge();
-    var payload = { date: g.d.date, plan_id: g.d.plan_id, session: g.d.session, exercises: g.ex.map(function (x) { var c = Object.assign({}, x); if (!x.rpeTouched && !x.rpeSaved) c.rpe = null; return c; }), note: g.note, finish: !!finish };
+    var payload = { date: g.d.date, plan_id: g.d.plan_id, session: g.d.session, exercises: g.ex.map(function (x) { var c = Object.assign({}, x); if (!x.rpeTouched && !x.rpeSaved) c.rpe = null; return c; }), note: g.note, finish: !!finish,
+      v: 2, base_updated_at: g.base || '', removed: (g.removed || []).slice() };
     return call('uiStrengthSave', payload).then(function (r) {
       g.inflight = false; g.saveSt = g.dirty ? 'pending' : 'saved'; if (r.finished_at) g.finished = r.finished_at; if (r.activity) g.d.activity = r.activity;
+      if (r.updated_at) g.base = r.updated_at;
+      if (r.merged && r.merged.length && r.exercises && G === g) gymMergeIn(r.exercises.filter(function (e) { return r.merged.indexOf(e.name) >= 0; }));
       if (!g.dirty) try { localStorage.removeItem(g.key); } catch (e) {}
       if (G === g) { gymSaveBadge(); if (finish) renderGym(); }
       return r;
@@ -571,7 +602,7 @@
     $('#gym-new').addEventListener('blur', function () { setTimeout(function () { if (!$('.gx-repl:not([hidden])')) gymPanel(false); }, 150); });
     $('#gym-new-ok').onclick = function () {
       var v = $('#gym-new').value.trim(); if (!v) return;
-      G.ex.push(gymFromParsed(gymLookup(v))); gymSaveSoon(); renderGym();
+      G.removed = (G.removed || []).filter(function (n) { return gymExKey(n) !== gymExKey(v); }); G.ex.push(gymFromParsed(gymLookup(v))); gymSaveSoon(); renderGym();
     };
     $('#gym-order').onclick = function () { G.order = !G.order; gymPanel(false); renderGym(); };
     if (G.order) { gymOrderBind(); return; }
@@ -650,7 +681,7 @@
         else e.sets.forEach(function (s) { if (s.reps === null || s.reps === undefined) s.reps = s.reps_g !== null && s.reps_g !== undefined ? s.reps_g : s.reps_d; });
         $$('[data-ge="uni"]', ov).forEach(function (x) { x.classList.toggle('on', x === b); }); paintSets(); return; }
       if (a === 'step') { step = +b.getAttribute('data-v'); $$('[data-ge="step"]', ov).forEach(function (x) { x.classList.toggle('on', x === b); }); return; }
-      if (a === 'rm') { if (!confirm('Retirer « ' + src.name + ' » de la séance ?')) return; close(); G.ex.splice(i, 1); gymSaveSoon(); renderGym(); window.scrollTo(0, y0); return; }
+      if (a === 'rm') { if (!confirm('Retirer « ' + src.name + ' » de la séance ?')) return; close(); G.removed = (G.removed || []).concat([G.ex[i].name]); G.ex.splice(i, 1); gymSaveSoon(); renderGym(); window.scrollTo(0, y0); return; }
       if (a === 'save') {
         read(); G.ex[i] = e;
         if (step !== step0) { G.d.steps = G.d.steps || {}; G.d.steps[gymKey(e.name)] = step; gymPersistStep(e.name, step, 0); }
@@ -1355,6 +1386,10 @@
         return '<div class="card pf-c"><div class="pf-l">Score de sommeil</div><div class="pf-v">' + (ss && ss.value ? n(+ss.value) + '<small>/100</small>' : '—') + '</div>' +
           '<div class="pf-s">' + (qd ? '<span class="pf-tag">' + esc(qd) + '</span>' : '') + (dd ? '<b>' + esc(String(dd).replace(':', 'h')) + '</b>' : '') + '</div>' +
           '<div class="pf-s">moy. 7 j <b>' + (avg !== null ? n(avg) : '—') + '</b> (calculé) · ' + dt(ss) + '</div>' + sp('sleep_score') + '</div>'; })() +
+      (function () { var bb = M.body_battery, h = (bb && bb.history) || [], last7 = h.filter(function (p) { return p.date > addDays(d.today, -7); });
+        var avg = last7.length ? last7.reduce(function (a, p) { return a + p.v; }, 0) / last7.length : null;
+        return '<div class="card pf-c"><div class="pf-l">Body Battery</div><div class="pf-v">' + (bb && bb.value ? n(+bb.value) + '<small>/100</small>' : '—') + '</div>' +
+          '<div class="pf-s">moy. 7 j <b>' + (avg !== null ? n(avg) : '—') + '</b>' + (avg !== null ? ' (calculé)' : '') + ' · ' + dt(bb) + pfDelta(bb) + '</div>' + sp('body_battery') + '</div>'; })() +
       '</div>' +
       '<h3 class="pf-h">Seuil lactique</h3><div class="pf-grid">' + card('lt_pace', { label: 'Allure seuil' }) + card('lt_hr', { label: 'FC seuil' }) +
       '<div class="card pf-c wide"><div class="pf-l">Référence dashboard</div><div class="pf-v">' + (ref.allure_seuil ? esc(ref.allure_seuil) + '<small>/km</small>' : '—') + ' · ' + (ref.fc_seuil ? esc(ref.fc_seuil) + '<small>bpm</small>' : '—') + '</div><div class="pf-s">utilisée pour les cibles des séances' + (ref.fc_max ? ' · FC max réf. ' + esc(ref.fc_max) : '') + '</div></div></div>';
@@ -1370,7 +1405,7 @@
         return '<div class="pf-pr-r"><div class="pf-pr-t"><span>' + esc(p.label) + '</span><b>' + (p.value ? esc(p.value) : '—') + '</b></div>' + (p.note ? '<em>' + esc(p.note) + '</em>' : '') + '</div>'; }).join('') + '</div>';
     $('#view').innerHTML = html;
     chartDefaults();
-    ['vo2max_run', 'lt_pace', 'lt_hr', 'rhr', 'sleep_score'].forEach(function (k) { pfSpark('sp-' + k, M[k], null, null, d.today); });
+    ['vo2max_run', 'lt_pace', 'lt_hr', 'rhr', 'sleep_score', 'body_battery'].forEach(function (k) { pfSpark('sp-' + k, M[k], null, null, d.today); });
     pfSpark('sp-acute_load', L, lo, hi, d.today, band);
     pfSpark('sp-hrv_night', hv, hl, hh, d.today);
   }
