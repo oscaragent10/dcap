@@ -2472,7 +2472,14 @@
   // Démarrage : semaine en cours embarquée par doGet (window.BOOT) → rendu immédiat, sans aller-retour serveur.
   // v85 : la semaine en cours se calcule d'après la date de New York, pas d'après le cache BOOT (qui peut dater de la veille / de la semaine dernière)
   S.today = etYmd(); S.curMonday = mondayOf(S.today); S.weekDay = null;
-  if (window.BOOT && window.BOOT.monday && window.BOOT.today === S.today) WK[window.BOOT.monday] = { data: window.BOOT, at: Date.now() };
+  // v103 : BOOT peut venir du cache local de la PWA (copie du matin) → horodatage réel (BOOT_AT, 0 = à revalider tout de suite), plus « frais » d'office.
+  if (window.BOOT && window.BOOT.monday && window.BOOT.today === S.today) WK[window.BOOT.monday] = { data: window.BOOT, at: typeof window.BOOT_AT === 'number' ? window.BOOT_AT : Date.now() };
+  // v103 : retour au premier plan (iOS garde l'app en mémoire) → la vue Semaine / Mois affichée est revalidée si elle a plus de 2 min
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    if (S.view === 'week') { var m = curWeekMonday(); if (m && WK[m]) revalidate(WK, m, 'uiWeek', [m], function (d) { if (S.view === 'week' && curWeekMonday() === d.monday) renderWeek(d, true); }); }
+    else if (S.view === 'month' && S.ym) { var k = S.ym[0] + '-' + S.ym[1]; if (MO[k]) revalidate(MO, k, 'uiMonth', [S.ym[0], S.ym[1]], function (d) { quietRender('mo', k, d); }); }
+  });
   /** v86 : note de séance — le clavier se ferme dès qu'on fait défiler la page (geste du doigt > 14 px) ; le texte reste dans le champ (brouillon intact, rien n'est envoyé). Le glissement qui démarre dans le champ lui-même, et les 700 ms après l'ouverture du clavier, sont ignorés. Chat du coach et autres champs : inchangés. */
   (function () {
     var y0 = null, x0 = 0, inTa = false, focusAt = 0;
