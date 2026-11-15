@@ -117,19 +117,25 @@
   function enqueue(fn, args) {
     return idb.push({ fn: fn, args: args, at: Date.now() }).then(function () { badge(); return { queued: true }; });
   }
-  var flushing = false;
+  // v101 : « dcap-flushed » (→ rechargement du chat) seulement si la file contenait quelque chose ; sinon au plus toutes les 5 min,
+  // app visible (pastille du coach). Avant : un uiChat serveur (~3-4 s d'exécution) toutes les 60 s dès que l'app était ouverte.
+  var flushing = false, lastPoke = Date.now();
   function flush() {
     if (flushing || !navigator.onLine) return Promise.resolve();
-    flushing = true;
+    flushing = true; var sent = 0;
     return Promise.all([idb.keys(), idb.all()]).then(function (kv) {
       var ks = kv[0], items = kv[1], i = 0;
       function next() {
         if (i >= items.length) return;
-        var k = ks[i], it = items[i++];
+        var k = ks[i], it = items[i++]; sent++;
         return remote(it.fn, it.args, it.fn === 'uiSendChat' ? 90000 : 30000, it.cid).then(function () { return idb.del(k); }, function (e) { if (e.offline) throw e; return idb.del(k); /* refus serveur : on n'insiste pas */ }).then(next);
       }
       return next();
-    }).catch(function () {}).then(function () { flushing = false; badge(); try { window.dispatchEvent(new Event('dcap-flushed')); } catch (e) {} });
+    }).catch(function () {}).then(function () {
+      flushing = false; badge();
+      var poke = sent > 0 || (document.visibilityState === 'visible' && Date.now() - lastPoke > 300000);
+      if (poke) { lastPoke = Date.now(); try { window.dispatchEvent(new Event('dcap-flushed')); } catch (e) {} }
+    });
   }
   function badge() { idb.keys().then(function (ks) { document.documentElement.classList.toggle('has-queue', ks.length > 0); window.DCAP.queued = ks.length; }).catch(function () {}); }
   window.addEventListener('online', function () { setStatus(); flush(); });
