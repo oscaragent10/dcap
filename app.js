@@ -2517,6 +2517,8 @@
   window.DCAP_APP = {
     busy: function () { var a = document.activeElement; if (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return true;
       if ($('#modal').classList.contains('open')) return true; if (G && (G.inflight || G.saveSt === 'pending')) return true; return false; },
+    hardBusy: function () { if (S.view === 'gym' || (G && (G.dirty || G.inflight || G.saveSt === 'pending'))) return true; // v102 : séance muscu ouverte
+      var ci = $('#chat-input'); if (ci && ci.value.trim()) return true; return false; }, // message de chat en cours d'écriture
     save: function () { try { if (G && G.dirty) localStorage.setItem(G.key, JSON.stringify({ t: Date.now(), ex: G.ex, note: G.note })); } catch (e) {}
       try { var v = $('#chat-input').value; if (v) localStorage.setItem('dcap-chat-draft', v); } catch (e) {} }
   };

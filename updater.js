@@ -1,4 +1,5 @@
-/* DCAP — mise à jour automatique : nouveau service worker (skipWaiting + claim) → rechargement unique, jamais pendant une saisie.
+/* DCAP — mise à jour automatique : nouveau service worker (skipWaiting + claim) → rechargement unique, jamais pendant une saisie,
+   une séance de muscu ouverte ou un message de chat non envoyé (v102).
    Vérifications : ouverture, retour au premier plan, toutes les 5 min, et quand l'API annonce un APP_BUILD différent du front. */
 (function () {
   'use strict';
@@ -6,6 +7,8 @@
   var LOCAL = String(window.APP_BUILD || '').split('-')[0], want = false, hadCtl = !!navigator.serviceWorker.controller, lastCheck = 0;
   function app() { return window.DCAP_APP || null; }
   function busy() { var a = app(); try { return a ? a.busy() : false; } catch (e) { return false; } }
+  // v102 : même app en arrière-plan, jamais de rechargement pendant une séance de muscu ouverte ou un message de chat en cours d'écriture
+  function hardBusy() { var a = app(); try { return a && a.hardBusy ? a.hardBusy() : false; } catch (e) { return false; } }
   function reload() {
     try { var t = +sessionStorage.getItem('dcap-reload-at') || 0; if (Date.now() - t < 15000) return; sessionStorage.setItem('dcap-reload-at', String(Date.now())); sessionStorage.setItem('dcap-updated', '1'); } catch (e) {}
     try { var a = app(); if (a) a.save(); } catch (e) {}
@@ -13,7 +16,8 @@
   }
   function tryReload() {
     if (!want) return;
-    if (document.visibilityState === 'hidden' || !busy()) reload(); // en arrière-plan : toujours sûr (brouillons sauvés)
+    if (hardBusy()) return; // séance muscu ouverte / texte dans le chat : on attend (nouvel essai toutes les 3 s, au retour, au clic…)
+    if (document.visibilityState === 'hidden' || !busy()) reload(); // en arrière-plan : sûr (brouillons sauvés)
   }
   navigator.serviceWorker.addEventListener('controllerchange', function () {
     if (!hadCtl) { hadCtl = true; return; } // première installation : la page est déjà la bonne
