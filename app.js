@@ -2103,7 +2103,8 @@
     // ---- cartes
     var OPS = [[/^Échanger/, '⇄', ''], [/^Déplacer/, '→', ''], [/^Ajouter/, '+', 'add'], [/^Supprimer/, '−', 'del'], [/^Modifier/, '✎', ''], [/^Objectif/, '◎', '']];
     function propCard(p) {
-      var st = p.status === 'pending' ? 'à valider' : p.status === 'accepted' ? 'validée ✓' : 'refusée';
+      var st = p.status === 'pending' ? 'à valider' : p.status === 'accepted' ? 'validée ✓' : p.status === 'superseded' ? 'remplacée' : 'refusée';
+      if (p.status === 'superseded') return ''; // v104 : carte remplacée par une plus récente → masquée
       var h = '<div class="pc ' + esc(p.status) + (C.just === p.proposal_id ? ' just' : '') + '"><div class="pc-h"><span>Proposition de plan</span><span class="pc-st">' + st + '</span></div><ul class="pc-ops">' +
         (p.preview || []).map(function (l) { var o = OPS.filter(function (x) { return x[0].test(l); })[0] || [0, '•', '']; return '<li><i class="op ' + o[2] + '">' + o[1] + '</i><span>' + esc(l) + '</span></li>'; }).join('') + '</ul>' +
         (p.rationale ? '<div class="pc-why">' + esc(p.rationale) + '</div>' : '');
@@ -2443,6 +2444,25 @@
     else if (S.view === 'perf') fetchCached(PF, 'p', 'uiPerf', []).then(function (d) { quietRender('pf', 'p', d); }).catch(function () {});
     setTimeout(preloadAll, 4000);
   }
+  /** v104 : témoin hors ligne (#net, à côté de « DCAP »). Classes sur <html> : is-offline (navigator.onLine faux),
+   *  srv-down (dernier appel serveur en échec / délai dépassé → données locales, posées par pwa/api.js). Appui : hors ligne → message ;
+   *  sinon même logique que ↻. Retour du réseau : témoin masqué + rafraîchissement silencieux de la vue. */
+  (function () {
+    var html = document.documentElement, net = $('#net'); if (!net) return;
+    function paint() {
+      var off = !navigator.onLine; html.classList.toggle('is-offline', off);
+      var t = off ? 'Hors ligne : données locales, toucher pour réessayer' : 'Serveur injoignable : données peut-être pas à jour, toucher pour réessayer';
+      net.title = t; net.setAttribute('aria-label', t);
+    }
+    window.addEventListener('offline', paint);
+    window.addEventListener('online', function () { paint(); html.classList.remove('srv-down', 'is-stale'); setTimeout(function () { try { quietRefresh(); } catch (e) {} }, 800); });
+    net.onclick = function (e) {
+      e.preventDefault(); paint();
+      if (!navigator.onLine) { toast('Toujours hors ligne : tu vois la copie locale', 3000); return; }
+      toast('Nouvel essai…', 1500); $('#btn-import').click();
+    };
+    paint();
+  })();
   $('#btn-import').onclick = function () {
     var b = this; if (b.classList.contains('spin')) return;
     b.classList.add('spin'); b.setAttribute('aria-busy', 'true');

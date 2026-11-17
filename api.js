@@ -40,6 +40,8 @@
       .then(function (r) { clearTimeout(h); if (!r.ok) throw net('HTTP ' + r.status); return r.json(); }, function (e) { clearTimeout(h); throw net(e && e.message || 'réseau'); });
   }
   function net(m) { var e = new Error(m); e.offline = true; return e; }
+  // v104 : témoin #net — srv-down = dernier appel en échec réseau / délai (Apps Script injoignable) ; is-stale = copie locale affichée à la place
+  function netState(ok, stale) { var c = document.documentElement.classList; c.toggle('srv-down', !ok); if (ok) c.remove('is-stale'); else if (stale) c.add('is-stale'); }
   var bootP = null;
   function boot(force) {
     if (bootP && !force) return bootP;
@@ -54,7 +56,11 @@
   }
   function token() { var k = ls('k'); return k ? Promise.resolve(k) : boot().then(function (d) { return d.k; }); }
   function remote(fn, args, ms, cid) {
+    return remote0(fn, args, ms, cid).catch(function (e) { if (e && e.offline) netState(false); throw e; });
+  }
+  function remote0(fn, args, ms, cid) {
     return token().then(function (k) { return post({ ui: fn, k: k, args: args, cid: cid || undefined }, ms); }).then(function (d) {
+      netState(true);
       if (d && d.ok) { if (d.build) ls('srv', String(d.build)); return d.r; }
       var msg = d && d.error || 'erreur';
       if (/Accès refusé/.test(msg)) return boot(true).then(function (b) { return post({ ui: fn, k: b.k, args: args, cid: cid || undefined }, ms); }).then(function (d2) { if (d2.ok) return d2.r; throw new Error(d2.error); });
@@ -73,7 +79,7 @@
         if (fn === 'uiWeek' && r && r.monday && r.today && r.monday <= r.today && r.today < addDays(r.monday, 7)) ls('boot', JSON.stringify(r));
         return r;
       }, function (e) {
-        return idb.get(key).then(function (hit) { if (hit) { hit.v && typeof hit.v === 'object' && (hit.v._cachedAt = hit.at); return hit.v; } throw e; });
+        return idb.get(key).then(function (hit) { if (hit) { if (e && e.offline) netState(false, true); hit.v && typeof hit.v === 'object' && (hit.v._cachedAt = hit.at); return hit.v; } throw e; });
       }).then(function (r) { return fn === 'uiChat' ? withQueued(r) : r; });
     }
     if (QUEUE[fn]) {
