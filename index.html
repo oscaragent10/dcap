@@ -1353,6 +1353,65 @@ html:has(#btn-import.spin) .topbar:after{opacity:1;animation:syncLine 1.3s var(-
 .gym-ex:not(.gx-ord) .gx-top .gx-name:before{content:counter(gx);display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-right:8px;vertical-align:2px;
   border:2px solid var(--ink);border-radius:50%;font:800 14px/1 var(--head);background:#fff;box-shadow:1.5px 1.5px 0 var(--gold)}
 </style>
+<style>
+/* ===================================================================== v107 : chat fiable
+   - ombre d'encre seulement sur les cartes du coach (v106 l'appliquait aussi aux conteneurs des bulles de Paul : trait parasite sous « lu ✓ »)
+   - bulle de Paul : ombre d'encre sur la bulle elle-même ; états d'envoi lisibles ; aucune animation hors nouveaux éléments */
+#chat .cm.me,#chat .cm.sys,#chat .dsep{box-shadow:none!important}
+#chat .me-b{box-shadow:2px 2px 0 rgba(31,36,34,.85)}
+#chat .cm.me.loc .me-b{opacity:.78}
+#chat .cm.me.ko .me-b{background:#5a2a1c;box-shadow:2px 2px 0 #B5562F}
+.me-meta .st-snd{color:var(--muted)} .me-meta .st-snd:after{content:'';display:inline-block;width:7px;height:7px;margin-left:5px;border:1.5px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-1px;animation:stSpin .8s linear infinite}
+.me-meta .st-q{color:#B5562F}
+.me-meta .st-ko{color:#B5562F;font-weight:600}
+.me-meta .lnk{font:inherit;letter-spacing:inherit;padding:6px 4px;margin:-6px 0;min-height:0;text-decoration:underline;text-underline-offset:2px;background:none;border:0;box-shadow:none;color:var(--green-d,#2a8a4e);cursor:pointer}
+.me-meta .lnk.mut{color:var(--muted)}
+@keyframes stSpin{to{transform:rotate(360deg)}}
+#chat-sc{overscroll-behavior:contain}
+@media (prefers-reduced-motion:reduce){.me-meta .st-snd:after{animation:none}#chat .cm.fresh{animation:none!important}}
+</style>
+
+
+<style>
+/* ===================================================================== v107 : Aperçu km hebdo (carnet Sisyf) */
+.ginfo.card{height:auto;min-height:0;overflow:visible;padding:0;margin:0 0 14px;border:1.5px solid var(--ink);border-radius:var(--radius);background:#fff;box-shadow:var(--hard);gap:0;display:block;font-size:11px}
+.ginfo .gi-top{display:flex;align-items:center;gap:10px;background:var(--ink);color:#F6F1E6;padding:6px 12px;border-radius:calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0 0;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+.ginfo .gi-wk{font-family:var(--head);font-weight:800;font-size:18px;letter-spacing:.04em;line-height:1}
+.ginfo .gi-d{opacity:.75}
+.ginfo .gi-tag{margin-left:auto;padding:2px 7px;border-radius:999px;border:1px solid rgba(246,241,230,.4);font-size:9px}
+.ginfo .gi-tag.cur{background:#3DBB6A;border-color:#3DBB6A;color:#10261a;font-weight:700}
+.ginfo .gi-tag.fut{border-style:dashed}
+.ginfo .gi-main{display:flex;align-items:baseline;gap:10px;padding:10px 12px 4px;height:44px;box-sizing:border-box}
+.ginfo .gi-km{font-family:var(--head);font-weight:700;font-size:16px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-2)}
+.ginfo .gi-km b{font-size:36px;font-weight:800;color:var(--ink);letter-spacing:0;margin-right:2px;line-height:.9}
+.ginfo .gi-km.none{font-size:20px;color:var(--muted)}
+.ginfo .gi-of{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.ginfo .gi-bar{position:relative;height:8px;margin:2px 12px 0;border-radius:4px;background:repeating-linear-gradient(135deg,#efe7d6 0 4px,#e6dcc6 4px 8px);overflow:hidden;border:1px solid rgba(31,36,34,.25)}
+.ginfo .gi-bar i{position:absolute;top:0;bottom:0;left:0} .ginfo .gi-bar i.d{background:var(--green)} .ginfo .gi-bar.ok i.d{background:linear-gradient(90deg,var(--green),#5FE08E)}
+.ginfo .gi-bar i.p{background:repeating-linear-gradient(90deg,rgba(31,36,34,.55) 0 3px,transparent 3px 6px);height:2px;top:3px}
+.ginfo .gi-chips{display:flex;gap:6px;padding:8px 12px 10px;overflow-x:auto;scrollbar-width:none;white-space:nowrap;height:40px;box-sizing:border-box;align-items:center}
+.ginfo .gi-chips::-webkit-scrollbar{display:none}
+.ginfo .gi-chips span{flex:none;display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;background:#F4EEE2;border:1px solid rgba(31,36,34,.14);font-size:10.5px;color:var(--ink-2)}
+.ginfo .gi-chips span b{color:var(--ink)} .ginfo .gi-chips i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.ginfo .gi-chips .c-race{background:#FFF1CF;border-color:#E8A830;color:#6d4c08;font-weight:600}
+.ginfo .gi-chips .c-dp{color:#7a5330}
+.graph-box.g107{height:300px;padding:10px 8px 4px;border-color:rgba(31,36,34,.5)}
+@media (min-width:761px){.graph-box.g107{height:380px}}
+.gchips{display:flex;flex-wrap:nowrap;gap:4px;margin:10px 0 2px;overflow-x:auto;scrollbar-width:none;font-size:10px;color:var(--ink-2)}
+.gchips::-webkit-scrollbar{display:none}
+.gchips span{flex:none;display:inline-flex;align-items:center;gap:4px;padding:2px 6px;font-size:9.5px;border:1px solid rgba(31,36,34,.18);border-radius:999px;background:rgba(255,255,255,.6)}
+.gchips i{display:inline-block;flex:none}
+.gchips i.sq{width:10px;height:10px;border-radius:2px}
+.gchips i.ln{width:14px;height:0;border-top:2.4px solid #D9961C}
+.gchips i.gh{width:9px;height:11px;border:1.3px dashed rgba(31,36,34,.75);background:#fff}
+.gchips i.fl{width:9px;height:11px;border-left:1.5px solid var(--ink);position:relative} .gchips i.fl:after{content:'';position:absolute;left:0;top:0;border-left:8px solid #E8A830;border-top:3.5px solid transparent;border-bottom:3.5px solid transparent}
+.gchips i.dp{width:11px;height:9px;background:linear-gradient(90deg,#8B5E34 0 3px,transparent 3px 4px,rgba(139,94,52,.45) 4px 7px,transparent 7px 8px,#8B5E34 8px 11px);clip-path:polygon(0 30%,27% 30%,27% 0,36% 0,36% 60%,64% 60%,64% 20%,73% 20%,73% 100%,0 100%)}
+.ghint{margin-top:4px;font-size:10px}
+@media (max-width:760px){
+  .tabbar{background:#1F2422}
+  .wrap{padding-bottom:calc(112px + max(env(safe-area-inset-bottom),var(--sab)))}
+}
+</style>
 
 </head>
 <body>
@@ -1430,18 +1489,18 @@ html:has(#btn-import.spin) .topbar:after{opacity:1;animation:syncLine 1.3s var(-
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '106-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '107-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
     window.BOOT_AT = 0; // v103 : copie locale = à revalider dès l'affichage (sinon la semaine restait celle du matin)
   </script>
-  <script src="api.js?b=106-p7"></script>
-  <script src="bridge.js?b=106-p7"></script>
-  <script src="updater.js?b=106-p7"></script>
+  <script src="api.js?b=107-p7"></script>
+  <script src="bridge.js?b=107-p7"></script>
+  <script src="updater.js?b=107-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=106-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=107-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started && d.week) { window.BOOT = d.week; window.BOOT_AT = Date.now(); } });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur

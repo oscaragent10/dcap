@@ -1276,52 +1276,56 @@
   }
 
   // ------------------------------------------------------------------ GRAPHIQUE KM HEBDO (v38 : sélecteur fixe en case 12, le graphique défile dessous)
+  var G_DRAWN = false; // v107 : animation de dessin une seule fois par session
   var G_VIS = 16, G_SLOT = 11; // 16 semaines visibles ; la semaine sélectionnée est toujours la 12e (11 avant, 4 après)
-  // Sélecteur fixe (bande + repères) et semaines de course (pointillé + « RACE WEEK » vertical).
-  var raceMarkers = {
-    id: 'raceMarkers',
-    beforeDatasetsDraw: function (chart, args, opts) {
-      if (opts.center === null || opts.center === undefined) return;
-      var ctx = chart.ctx, a = chart.chartArea, x = chart.scales.x, w = x.getPixelForValue(1) - x.getPixelForValue(0), xp = x.getPixelForValue(opts.center);
-      ctx.save(); ctx.fillStyle = 'rgba(31,36,34,.07)'; ctx.fillRect(xp - w / 2, a.top, w, a.bottom - a.top); ctx.restore();
-    },
-    afterDatasetsDraw: function (chart, args, opts) {
-      var ctx = chart.ctx, a = chart.chartArea, x = chart.scales.x;
-      (opts.items || []).forEach(function (idx) {
-        if (idx < x.min || idx > x.max) return;
-        var xp = Math.round(x.getPixelForValue(idx)) + 0.5;
-        ctx.save(); ctx.beginPath(); ctx.rect(a.left, a.top, a.right - a.left, a.bottom - a.top); ctx.clip();
-        ctx.font = '600 9.5px "IBM Plex Mono", monospace';
-        var spaced = 'letterSpacing' in ctx; if (spaced) ctx.letterSpacing = '1.5px';
-        var txt = spaced ? 'RACE WEEK' : 'R A C E  W E E K', tw = ctx.measureText(txt).width;
-        var g0 = a.top + 6, g1 = g0 + tw + 8;
-        ctx.strokeStyle = '#C89020'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
-        ctx.beginPath(); ctx.moveTo(xp, a.top); ctx.lineTo(xp, g0); ctx.moveTo(xp, g1); ctx.lineTo(xp, a.bottom); ctx.stroke(); ctx.setLineDash([]);
-        ctx.translate(xp, g1 - 4); ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = '#9A6E10'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 0);
-        ctx.restore();
-      });
-      if (opts.center === null || opts.center === undefined) return;
-      // repères du sélecteur : cadre fin + triangles haut / bas
-      var w = x.getPixelForValue(1) - x.getPixelForValue(0), xp = x.getPixelForValue(opts.center);
-      ctx.save(); ctx.strokeStyle = 'rgba(31,36,34,.55)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(xp - w / 2) + 0.5, a.top + 0.5, Math.round(w) - 1, a.bottom - a.top - 1);
-      ctx.fillStyle = '#1F2422';
-      ctx.beginPath(); ctx.moveTo(xp - 6, a.top - 1); ctx.lineTo(xp + 6, a.top - 1); ctx.lineTo(xp, a.top + 6); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(xp - 6, a.bottom + 1); ctx.lineTo(xp + 6, a.bottom + 1); ctx.lineTo(xp, a.bottom - 6); ctx.closePath(); ctx.fill();
+  // v107 : un seul plugin « semaines » — colonne de la semaine choisie (onglet d'encre « S47 »), semaine en cours (pastille verte),
+  // reste prévu en barre fantôme pointillée, semaines de course = petit fanion sur l'axe, D+ en mini-barres sous l'axe (plus de 2e échelle).
+  function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  var wkPlugin = {
+    id: 'wk',
+    beforeDatasetsDraw: function (chart, args, o) {
+      var ctx = chart.ctx, a = chart.chartArea, x = chart.scales.x, w = x.getPixelForValue(1) - x.getPixelForValue(0);
+      ctx.save(); ctx.beginPath(); ctx.rect(a.left, a.top - 14, a.right - a.left, a.bottom - a.top + 14); ctx.clip();
+      if (o.cur !== null && Math.round(o.center) !== o.cur) { ctx.fillStyle = 'rgba(61,187,106,.10)'; ctx.fillRect(x.getPixelForValue(o.cur) - w / 2, a.top, w, a.bottom - a.top); }
+      var xp = x.getPixelForValue(o.center); ctx.fillStyle = 'rgba(232,168,48,.16)'; ctx.fillRect(xp - w / 2, a.top, w, a.bottom - a.top);
       ctx.restore();
-    }
-  };
-  // Autres activités de la semaine : une pastille par type présent (couleur de la palette), sous les libellés de l'axe.
-  var sportDots = {
-    id: 'sportDots',
-    afterDraw: function (chart, args, opts) {
-      var x = chart.scales.x, a = chart.chartArea, ctx = chart.ctx, yy = chart.height - 7, order = ['muscu'].concat(SPORTS);
-      (opts.weeks || []).forEach(function (w, i) {
-        var ts = order.filter(function (t) { return w.other && w.other[t]; }); if (!ts.length) return;
-        var r = 3, gap = 2, tot = ts.length * (2 * r) + (ts.length - 1) * gap, x0 = x.getPixelForValue(i) - tot / 2 + r;
-        if (x0 - r < a.left - 2 || x0 + tot > a.right + 2) return;
-        ts.forEach(function (t, k) { ctx.save(); ctx.beginPath(); ctx.arc(x0 + k * (2 * r + gap), yy, r, 0, 2 * Math.PI); ctx.fillStyle = PAL[t]; ctx.fill(); ctx.restore(); });
+    },
+    afterDatasetsDraw: function (chart, args, o) {
+      var ctx = chart.ctx, a = chart.chartArea, x = chart.scales.x, y = chart.scales.y, w = x.getPixelForValue(1) - x.getPixelForValue(0), W = o.weeks || [];
+      ctx.save(); ctx.beginPath(); ctx.rect(a.left, 0, a.right - a.left, chart.height); ctx.clip();
+      // reste prévu (semaine en cours et à venir) : barre fantôme pointillée au-dessus du réalisé
+      W.forEach(function (wk, i) {
+        if (i < o.cur || i < x.min - 1 || i > x.max + 1) return;
+        var done = (+wk.road_km || 0) + (+wk.trail_km || 0), pr = +o.proj[i] || 0; if (pr <= done + 0.05) return;
+        var bw = w * 0.72, x0 = x.getPixelForValue(i) - bw / 2, y1 = y.getPixelForValue(pr), y0 = y.getPixelForValue(done);
+        ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(x0, y1, bw, y0 - y1);
+        ctx.setLineDash([3, 2.5]); ctx.lineWidth = 1.3; ctx.strokeStyle = 'rgba(31,36,34,.75)'; ctx.strokeRect(Math.round(x0) + 0.5, Math.round(y1) + 0.5, Math.round(bw) - 1, Math.round(y0 - y1)); ctx.setLineDash([]);
       });
+      // semaines de course : fanion doré sur l'axe
+      (o.races || []).forEach(function (idx) {
+        if (idx < x.min || idx > x.max) return; var xp = Math.round(x.getPixelForValue(idx)) + 0.5, b = a.bottom;
+        ctx.strokeStyle = '#1F2422'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(xp - w * 0.3, b - 0.5); ctx.lineTo(xp - w * 0.3, b - 17); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(xp - w * 0.3, b - 17); ctx.lineTo(xp - w * 0.3 + 11, b - 13.5); ctx.lineTo(xp - w * 0.3, b - 10); ctx.closePath();
+        ctx.fillStyle = '#E8A830'; ctx.fill(); ctx.stroke();
+      });
+      // semaine en cours : pastille verte en haut
+      if (o.cur !== null && o.cur >= x.min && o.cur <= x.max) { ctx.beginPath(); ctx.arc(x.getPixelForValue(o.cur), a.top + 5, 3.2, 0, 2 * Math.PI); ctx.fillStyle = '#3DBB6A'; ctx.fill(); }
+      // D+ : mini-barres sous les libellés de l'axe (échelle commune à toutes les semaines : rien ne saute au balayage)
+      var sy1 = chart.height - 4, sh = 16, mx = o.dmax || 1;
+      W.forEach(function (wk, i) {
+        var v = +wk.done_d_plus_m || 0; if (!v || i < x.min - 1 || i > x.max + 1) return;
+        var h = Math.max(1.5, sh * v / mx), bw = Math.max(3, w * 0.42), xp = x.getPixelForValue(i);
+        ctx.fillStyle = i === Math.round(o.center) ? '#8B5E34' : 'rgba(139,94,52,.42)'; ctx.fillRect(xp - bw / 2, sy1 - h, bw, h);
+      });
+      ctx.restore();
+      ctx.save(); ctx.font = '600 9px "IBM Plex Mono", monospace'; ctx.fillStyle = '#8B5E34'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('D+', a.left - 5, chart.height - 3); ctx.restore();
+      // onglet d'encre de la semaine choisie
+      var xp = x.getPixelForValue(o.center), wkL = W[Math.round(o.center)] ? 'S' + W[Math.round(o.center)].iso_week.slice(6) : '';
+      ctx.save(); ctx.font = '700 9.5px "IBM Plex Mono", monospace'; var tw = Math.max(w, ctx.measureText(wkL).width + 10);
+      ctx.fillStyle = '#1F2422'; rrect(ctx, xp - tw / 2, a.top - 15, tw, 14, 3); ctx.fill();
+      ctx.fillStyle = '#FFF8E8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(wkL, xp, a.top - 7.5);
+      ctx.fillStyle = '#1F2422'; ctx.fillRect(xp - w / 2, a.bottom, w, 2.5);
+      ctx.restore();
     }
   };
   function chartDefaults() {
@@ -1641,31 +1645,39 @@
   /** Bandeau de la semaine sélectionnée (hauteur fixe, en haut) : « S39 · 64,1 km · +720 m · R 44 · T 20 » puis les autres activités. */
   function graphInfo(w) {
     if (!w) return '';
-    var k = function (x) { return x === null || x === undefined ? '–' : n(x, x % 1 ? 1 : 0); }, parts = [];
-    if (w.is_future) { parts.push(w.projection_km ? '<b>' + k(w.projection_km) + ' km</b> prévus' : 'rien de prévu'); if (w.target_km) parts.push('cible ' + k(w.target_km)); }
-    else {
-      parts.push('<b>' + k(w.done_km) + ' km</b>' + (w.is_current && w.target_km ? ' / ' + k(w.target_km) : ''));
-      if (w.is_current && w.projection_km !== null && w.projection_km !== undefined) parts.push('proj ' + k(w.projection_km));
-      if (w.done_d_plus_m) parts.push('+' + n(w.done_d_plus_m) + ' m');
-      if (w.road_km) parts.push('R ' + n(w.road_km, 0)); if (w.trail_km) parts.push('T ' + n(w.trail_km, 0));
+    var k = function (x) { return x === null || x === undefined ? '–' : n(x, x % 1 ? 1 : 0); }, chips = [];
+    var tag = w.is_current ? '<span class="gi-tag cur">en cours</span>' : w.is_future ? '<span class="gi-tag fut">à venir</span>' : '<span class="gi-tag">faite</span>';
+    var main, bar = '';
+    if (w.is_future) {
+      main = w.projection_km ? '<span class="gi-km"><b>' + k(w.projection_km) + '</b> km prévus</span>' : '<span class="gi-km none">rien de prévu</span>';
+      if (w.target_km) main += '<span class="gi-of">cible ' + k(w.target_km) + '</span>';
+    } else {
+      main = '<span class="gi-km"><b>' + k(w.done_km) + '</b> km</span>' + (w.target_km ? '<span class="gi-of">/ ' + k(w.target_km) + ' cible</span>' : '');
+      if (w.target_km) {
+        var tgt = +w.target_km, pd = Math.min(100, 100 * (+w.done_km || 0) / tgt), pp = w.is_current && w.projection_km ? Math.min(100, 100 * (+w.projection_km) / tgt) : 0;
+        bar = '<div class="gi-bar' + (pd >= 100 ? ' ok' : '') + '"><i class="d" style="width:' + pd.toFixed(1) + '%"></i>' + (pp > pd ? '<i class="p" style="left:' + pd.toFixed(1) + '%;width:' + (pp - pd).toFixed(1) + '%"></i>' : '') + '</div>';
+      }
+      if (w.is_current && w.projection_km !== null && w.projection_km !== undefined) chips.push('<span class="c-proj">proj <b>' + k(w.projection_km) + '</b></span>');
+      if (w.done_d_plus_m) chips.push('<span class="c-dp">D+ <b>' + n(w.done_d_plus_m) + '</b> m</span>');
+      if (w.road_km) chips.push('<span><i style="background:' + PAL.route + '"></i>Route <b>' + n(w.road_km, 0) + '</b></span>');
+      if (w.trail_km) chips.push('<span><i style="background:' + PAL.trail + '"></i>Trail <b>' + n(w.trail_km, 0) + '</b></span>');
     }
-    var oth = ['muscu'].concat(SPORTS).filter(function (t) { return w.other && w.other[t]; }).map(function (t) {
+    ['muscu'].concat(SPORTS).filter(function (t) { return w.other && w.other[t]; }).forEach(function (t) {
       var o = w.other[t], lb = t === 'autre' && o.labels && o.labels.length ? o.labels.join(', ') : TYPE_LBL[t];
-      var v = t === 'natation' && o.km ? n(o.km * 1000) + ' m' : hmC(o.s);
-      return '<span><i style="background:' + PAL[t] + '"></i>' + esc(lb) + ' ' + v + '</span>'; }).join('');
-    return '<div class="gi-h"><b>S' + w.iso_week.slice(6) + ' · ' + dm(w.monday) + '</b>' + (w.is_current ? ' <em>en cours</em>' : w.is_future ? ' <em>à venir</em>' : '') + '</div>' +
-      '<div class="gi-v">' + parts.join(' · ') + '</div>' + (oth ? '<div class="gi-o">' + oth + '</div>' : '') +
-      w.races.map(function (r) { return '<div class="gi-r">🏁 ' + DOW[dowIdx(r.date)] + ' ' + dm(r.date) + ' : ' + esc(r.name) + '</div>'; }).join('');
+      chips.push('<span><i style="background:' + PAL[t] + '"></i>' + esc(lb) + ' <b>' + (t === 'natation' && o.km ? n(o.km * 1000) + ' m' : hmC(o.s)) + '</b></span>'); });
+    w.races.forEach(function (r) { chips.unshift('<span class="c-race">⚑ ' + DOW[dowIdx(r.date)] + ' ' + dm(r.date) + ' · ' + esc(r.name) + '</span>'); });
+    return '<div class="gi-top"><span class="gi-wk">S' + w.iso_week.slice(6) + '</span><span class="gi-d">' + dm(w.monday) + ' → ' + dm(addDays(w.monday, 6)) + '</span>' + tag + '</div>' +
+      '<div class="gi-main">' + main + '</div>' + bar + '<div class="gi-chips">' + chips.join('') + '</div>';
   }
   function renderGraph(d) {
     destroyCharts();
     var W = d.weeks, N = W.length, mob = MOBILE.matches;
     var cur = W.findIndex(function (w) { return w.is_current; }); if (cur < 0) cur = N - 1;
-    $('#view').innerHTML = '<div class="sec"><h2><span class="n">▮</span>Km hebdo</h2><div class="right"><span class="mono-label">course uniquement · horizon ' + (d.horizon ? dm(d.horizon) : '–') + '</span></div></div>' +
-      '<div class="ginfo" id="ginfo" aria-live="polite"></div>' +
-      '<div class="card graph-box" id="gbox" tabindex="0" aria-label="Graphique des km par semaine : glisser pour changer de semaine"><canvas id="g"></canvas></div>' +
-      '<div class="glegend" id="glegend"></div><div class="sub ghint">Glisse le graphique pour changer de semaine.</div><div id="rp-list"></div>';
-    fetchRace(null).then(function (r) { var el = document.getElementById('rp-list'); if (!el || !r.races || !r.races.length) return; el.innerHTML = '<div class="sec"><h2><span class="n">▮</span>Plans de course</h2></div>' + renderRaceList(r); bindRaceLinks(); }).catch(function () {});
+    $('#view').innerHTML = '<div class="sec"><h2><span class="n">1</span>Km hebdo</h2><div class="right"><span class="mono-label">course · horizon ' + (d.horizon ? dm(d.horizon) : '–') + '</span></div></div>' +
+      '<div class="ginfo card" id="ginfo" aria-live="polite"></div>' +
+      '<div class="card graph-box g107" id="gbox" tabindex="0" aria-label="Graphique des km par semaine : glisser pour changer de semaine"><canvas id="g"></canvas></div>' +
+      '<div class="gchips" id="gchips"></div><div class="sub ghint">Glisse ou touche une semaine.</div><div id="rp-list"></div>';
+    fetchRace(null).then(function (r) { var el = document.getElementById('rp-list'); if (!el || !r.races || !r.races.length) return; el.innerHTML = '<div class="sec"><h2><span class="n">2</span>Plans de course</h2></div>' + renderRaceList(r); bindRaceLinks(); }).catch(function () {});
     chartDefaults();
     var proj = W.map(function (w, i) { return { x: i, y: i === cur - 1 ? w.done_km : (i >= cur ? w.projection_km : null) }; });
     var races = []; W.forEach(function (w, i) { if (w.races.length) races.push(i); });
@@ -1675,53 +1687,52 @@
     var scaleFor = function (c) {
       var lo = Math.max(0, Math.round(c) - G_SLOT), hi = Math.min(N - 1, Math.round(c) + (G_VIS - 1 - G_SLOT)), m = 0, m2 = 0;
       for (var i = lo; i <= hi; i++) { var w = W[i]; [(+w.road_km || 0) + (+w.trail_km || 0), w.done_km, w.target_km, proj[i].y].forEach(function (v) { if (+v > m) m = +v; }); if (+w.done_d_plus_m > m2) m2 = +w.done_d_plus_m; }
-      return { y: Math.max(20, Math.ceil(m * 1.1 / 10) * 10), y2: Math.max(200, Math.ceil(m2 * 1.1 / 100) * 100) };
+      var st = m * 1.1 > 60 ? 20 : 10; return { y: Math.max(20, Math.ceil(m * 1.1 / st) * st) }; // v107 : sommet = graduation ronde
     };
     var sc0 = scaleFor(cur);
+    var dmax = 1; W.forEach(function (w) { if (+w.done_d_plus_m > dmax) dmax = +w.done_d_plus_m; });
+    var projV = proj.map(function (p, i) { return i >= cur ? p.y : null; });
+    var animOn = !G_DRAWN && !REDUCED.matches; G_DRAWN = true; // dessin animé : première ouverture seulement
     var chart = new Chart($('#g'), {
       type: 'bar',
       data: {
         datasets: [
-          { type: 'bar', label: 'Route', stack: 'km', data: pts(function (w) { return w.road_km; }), backgroundColor: W.map(function (w) { return w.is_current ? rgba(PAL.route, .55) : PAL.route; }), borderRadius: 0, yAxisID: 'y', order: 3, barPercentage: .9, categoryPercentage: .8 },
-          { type: 'bar', label: 'Trail', stack: 'km', data: pts(function (w) { return w.trail_km; }), backgroundColor: W.map(function (w) { return w.is_current ? rgba(PAL.trail, .55) : PAL.trail; }), borderRadius: 0, yAxisID: 'y', order: 3, barPercentage: .9, categoryPercentage: .8 },
-          { type: 'line', label: 'Cible', stack: 'cible', data: pts(function (w) { return w.target_km; }), borderColor: '#E8A830', backgroundColor: '#E8A830', stepped: 'middle', pointRadius: 0, borderWidth: 2, spanGaps: false, yAxisID: 'y', order: 1 },
-          { type: 'line', label: 'Projection', stack: 'proj', data: proj, borderColor: '#1F2422', borderDash: [6, 4], pointRadius: 3, pointBackgroundColor: '#fff', borderWidth: 1.5, yAxisID: 'y', order: 2 },
-          { type: 'line', label: 'D+ (m)', stack: 'dplus', data: pts(function (w) { return w.done_d_plus_m; }), borderColor: '#8B5E34', backgroundColor: '#8B5E34', pointRadius: 2, borderWidth: 1.2, yAxisID: 'y2', order: 0 }
+          { type: 'bar', label: 'Route', stack: 'km', data: pts(function (w) { return w.road_km; }), backgroundColor: PAL.route, borderRadius: 0, yAxisID: 'y', order: 3, barPercentage: .9, categoryPercentage: .8 },
+          { type: 'bar', label: 'Trail', stack: 'km', data: pts(function (w) { return w.trail_km; }), backgroundColor: PAL.trail, borderRadius: { topLeft: 2, topRight: 2 }, borderSkipped: 'bottom', yAxisID: 'y', order: 3, barPercentage: .9, categoryPercentage: .8 },
+          { type: 'line', label: 'Cible', stack: 'cible', data: pts(function (w) { return w.target_km; }), borderColor: '#D9961C', backgroundColor: '#D9961C', stepped: 'middle', pointRadius: 0, borderWidth: 2.4, spanGaps: false, yAxisID: 'y', order: 1 }
         ]
       },
       options: {
-        responsive: true, maintainAspectRatio: false, animation: false, events: [], parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+        responsive: true, maintainAspectRatio: false, events: [], parsing: { xAxisKey: 'x', yAxisKey: 'y' },
+        animation: animOn ? { duration: 700, easing: 'easeOutQuart', delay: function (c) { return c.type === 'data' && c.mode === 'default' ? Math.max(0, c.dataIndex - (cur - G_SLOT)) * 22 : 0; } } : false,
         scales: {
-          x: { type: 'linear', offset: false, min: cur - G_SLOT - 0.5, max: cur + (G_VIS - 1 - G_SLOT) + 0.5, stacked: true, grid: { display: false },
+          x: { type: 'linear', offset: false, min: cur - G_SLOT - 0.5, max: cur + (G_VIS - 1 - G_SLOT) + 0.5, stacked: true, grid: { display: false }, border: { color: '#1F2422', width: 1.2 },
             afterBuildTicks: function (s) { var t = []; for (var i = Math.ceil(s.min); i <= Math.floor(s.max); i++) t.push({ value: i }); s.ticks = t; },
-            ticks: { autoSkip: false, maxRotation: 0, callback: function (v) { return W[v] && (!mob || v % 2 === 0) ? W[v].label : ''; } } },
-          // deux bandes empilées à gauche : km (bas, 3/4) et D+ (haut, 1/4) → la courbe D+ ne recouvre plus les barres
-          y: { stacked: true, beginAtZero: true, max: sc0.y, stack: 'v', stackWeight: 3, title: { display: !mob, text: 'km' }, grid: { color: '#ECE6DA' } },
-          y2: { position: 'left', stack: 'v', stackWeight: 1, offset: true, beginAtZero: true, max: sc0.y2, title: { display: !mob, text: 'D+ m' },
-            grid: { color: '#F3EEE3' }, border: { display: false }, ticks: { maxTicksLimit: 3, color: '#8B5E34', callback: function (v) { return v ? n(v) : ''; } } }
+            ticks: { autoSkip: false, maxRotation: 0, padding: 5, font: { size: 9.5 }, color: '#6B6F6A', callback: function (v) { return W[v] && v % (mob ? 3 : 2) === (cur % (mob ? 3 : 2)) ? W[v].label : ''; } } },
+          y: { stacked: true, beginAtZero: true, max: sc0.y, grid: { color: 'rgba(31,36,34,.08)', drawTicks: false }, border: { display: false },
+            ticks: { stepSize: sc0.y > 60 ? 20 : 10, padding: 6, font: { size: 9.5 }, color: '#6B6F6A' }, title: { display: !mob, text: 'km' } }
         },
-        layout: { padding: { top: 8, bottom: 14 } },
-        plugins: { raceMarkers: { items: races, center: cur }, sportDots: { weeks: W }, legend: { display: false }, tooltip: { enabled: false } }
+        layout: { padding: { top: 18, bottom: 22, right: 2 } },
+        plugins: { wk: { races: races, center: cur, cur: cur, weeks: W, proj: projV, dmax: dmax }, legend: { display: false }, tooltip: { enabled: false } }
       },
-      plugins: [raceMarkers, sportDots]
+      plugins: [wkPlugin]
     });
+    if (animOn) setTimeout(function () { chart.options.animation = false; }, 1300);
     S.charts.push(chart);
     $('#ginfo').innerHTML = graphInfo(W[sel]);
-    // légende compacte (mêmes couleurs que partout) : barres, lignes, pastilles des autres activités présentes
-    var present = ['muscu'].concat(SPORTS).filter(function (t) { return W.some(function (w) { return w.other && w.other[t]; }); });
-    $('#glegend').innerHTML = '<span><i class="sq" style="background:' + PAL.route + '"></i>Route</span><span><i class="sq" style="background:' + PAL.trail + '"></i>Trail</span>' +
-      '<span><i class="ln" style="border-color:#E8A830"></i>Cible</span><span><i class="ln dash" style="border-color:#1F2422"></i>Projection</span><span><i class="ln" style="border-color:#8B5E34"></i>D+ (bande du haut)</span>' +
-      present.map(function (t) { return '<span><i class="dot" style="background:' + PAL[t] + '"></i>' + TYPE_LBL[t] + '</span>'; }).join('');
+    // v107 : légende en puces sur une ligne (la classe .glegend v106 de la carte l'avait cassée)
+    $('#gchips').innerHTML = '<span><i class="sq" style="background:' + PAL.route + '"></i>Route</span><span><i class="sq" style="background:' + PAL.trail + '"></i>Trail</span>' +
+      '<span><i class="ln"></i>Cible</span><span><i class="gh"></i>Prévu</span><span><i class="fl"></i>Course</span><span><i class="dp"></i>D+</span>';
     // v74 : glisser fluide — une seule mise à jour du graphique par image (requestAnimationFrame), échelle verticale figée pendant le geste,
     // inertie à décroissance exponentielle, élastique doux aux bords, puis aimantation sur une semaine (échelle mise à jour une fois à la fin).
     var drawRaf = 0, gesture = false;
     var render = function () {
       drawRaf = 0;
       var xs = chart.options.scales.x; xs.min = view - G_SLOT - 0.5; xs.max = view + (G_VIS - 1 - G_SLOT) + 0.5;
-      chart.options.plugins.raceMarkers.center = view;
+      chart.options.plugins.wk.center = view;
       var i = Math.max(0, Math.min(N - 1, Math.round(view)));
       if (i !== sel) { sel = i; $('#ginfo').innerHTML = graphInfo(W[sel]); }
-      if (!gesture) { var sc = scaleFor(sel); chart.options.scales.y.max = sc.y; chart.options.scales.y2.max = sc.y2; }
+      if (!gesture) { var sc = scaleFor(sel); chart.options.scales.y.max = sc.y; chart.options.scales.y.ticks.stepSize = sc.y > 60 ? 20 : 10; }
       chart.update('none');
     };
     var setView = function (v, free) { view = free ? v : Math.max(0, Math.min(N - 1, v)); if (!drawRaf) drawRaf = requestAnimationFrame(render); };
@@ -1732,7 +1743,7 @@
     var animateTo = function (target) {
       cancelAnimationFrame(raf); target = Math.max(0, Math.min(N - 1, Math.round(target)));
       var from = view, t0 = performance.now(), T = Math.min(380, 180 + Math.abs(target - from) * 40);
-      gesture = false; var sc = scaleFor(target); chart.options.scales.y.max = sc.y; chart.options.scales.y2.max = sc.y2; // échelle : une fois
+      gesture = false; var sc = scaleFor(target); chart.options.scales.y.max = sc.y; // échelle : une fois
       (function step(t) { var p = Math.min(1, (t - t0) / T), e = 1 - Math.pow(1 - p, 3); setView(from + (target - from) * e, true); if (p < 1) raf = requestAnimationFrame(step); })(t0);
     };
     var glide = function (velSlots) { // velSlots : semaines / ms
@@ -2169,11 +2180,49 @@
     pill.onclick = function () { toEnd(true); };
 
     // ---- données
-    function apply(r) {
-      C.msgs = r.messages || C.msgs; C.mode = r.mode || C.mode; C.pending = r.pending || 0;
-      (r.proposals || []).forEach(function (p) { C.props[p.proposal_id] = p; });
-      (r.actions || []).forEach(function (a) { C.acts[a.action_id] = a; });
-      if (r.unread !== undefined) setUnread(r.unread);
+    // ---- v107 : UNE source de vérité pour le fil. Messages serveur rangés par msg_id (union, jamais remplacés en bloc),
+    // messages locaux (envoi en cours / hors ligne / échec) à part, rattachés à leur copie serveur par le texte.
+    // Chaque requête reçoit un numéro (seq) au départ : une réponse partie AVANT la dernière écriture n'écrase jamais un état plus récent.
+    var ST = { srv: {}, loc: [], seq: 0, wseq: 0, alias: {}, picks: {} };
+    function nextSeq() { return ++ST.seq; }
+    function lid() { return 'L' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+    function claim(m) { // message serveur de Paul ↔ message local de même texte (le plus ancien non rattaché)
+      if (m.role !== 'user') return;
+      var ms = tsMs(m.ts) || 0, best = -1;
+      ST.loc.forEach(function (l, i) { if (best < 0 && l.text === m.text && (!ms || l._ms - ms < 600000) && ms - l._ms < 3600000) best = i; });
+      if (best < 0) return;
+      ST.alias[m.msg_id] = ST.loc[best]._key; ST.loc.splice(best, 1);
+    }
+    function merge(r, seq, cached) {
+      var auth = !cached && seq >= ST.wseq, q = {};
+      (r.messages || []).forEach(function (m) {
+        if (!m.msg_id) { if (m.queued) q[m.text] = (q[m.text] || 0) + 1; return; }
+        var cur = ST.srv[m.msg_id];
+        if (!cur) { cur = ST.srv[m.msg_id] = Object.assign({}, m); cur._seq = auth ? seq : 0; claim(cur); }
+        else if (auth && seq >= (cur._seq || 0)) { Object.assign(cur, m); cur._seq = seq; }
+      });
+      if (window.DCAP && r.messages) { // file hors ligne de la PWA (lue en direct, même avec une copie locale) : messages encore en attente de réseau
+        ST.loc.forEach(function (l) { if (l._state === 'queued' || l._state === 'sending') { if (q[l.text]) { q[l.text]--; l._state = 'queued'; } else if (l._state === 'queued' && auth) { l._state = 'sent'; l._sentAt = Date.now(); } } });
+        Object.keys(q).forEach(function (t) { for (var i = 0; i < q[t]; i++) ST.loc.push({ _key: 'm|' + lid(), role: 'user', text: t, ts: etNow(), _ms: Date.now(), status: 'pending', _state: 'queued' }); });
+      }
+      var ids = Object.keys(ST.srv); if (ids.length > 160) ids.map(function (k) { return ST.srv[k]; }).sort(byMs).slice(0, ids.length - 160).forEach(function (m) { delete ST.srv[m.msg_id]; });
+      if (auth) Object.keys(ST.picks).forEach(function (id) { var m = ST.srv[id]; if (m && m.picks) delete ST.picks[id]; });
+      if (!cached || !C.mode) C.mode = r.mode || C.mode;
+      (r.proposals || []).forEach(function (p) { if (auth || !C.props[p.proposal_id]) C.props[p.proposal_id] = p; });
+      (r.actions || []).forEach(function (a) { if (auth || !C.acts[a.action_id]) C.acts[a.action_id] = a; });
+      if (auth && r.unread !== undefined) setUnread(r.unread);
+      rebuild();
+    }
+    function byMs(a, b) { return (a._ms || 0) - (b._ms || 0); }
+    function rebuild() {
+      var all = Object.keys(ST.srv).map(function (k) { var m = ST.srv[k]; m._ms = tsMs(m.ts) || 0; m._key = ST.alias[k] || 'm|' + k; if (ST.picks[k] && !m.picks) m.picks = ST.picks[k]; return m; });
+      ST.loc.forEach(function (l) { if (l._state === 'sent' && Date.now() - (l._sentAt || 0) > 180000) l._state = 'failed'; }); // jamais arrivé au serveur
+      all = all.concat(ST.loc); all.sort(byMs);
+      C.msgs = all.slice(-80);
+      C.pending = C.msgs.filter(function (m) { return m.role === 'user' && (m._state ? m._state !== 'failed' : m.status === 'pending'); }).length;
+    }
+    function apply(r, seq, cached) {
+      merge(r || {}, seq === undefined ? nextSeq() : seq, cached);
       $('#chat-mode').textContent = C.mode === 'xai' ? 'mode API xAI · réponse immédiate' : 'répond en 1 à 2 min';
       var nAssist = C.msgs.filter(function (m) { return m.role !== 'user'; }).length;
       if (!C.isOpen && nAssist > C.seen && C.seen) setNew(true);
@@ -2190,7 +2239,7 @@
         strip(); render();
       }).catch(function (e) { C.briefAt = 0; console.warn(e); });
     }
-    function oldestPending() { return C.msgs.filter(function (m) { return m.role === 'user' && m.status === 'pending'; })[0]; }
+    function oldestPending() { return C.msgs.filter(function (m) { return m.role === 'user' && (m._state ? m._state !== 'failed' : m.status === 'pending'); })[0]; }
     function waiting() { return C.sending || C.pending > 0; }
     // interrogation : toutes les 6 s les 4 premières minutes d'attente, puis 15 s (même coach fermé → pastille)
     function schedule() {
@@ -2203,8 +2252,14 @@
     function elapsed() { var o = oldestPending(), s = o ? Math.max(0, Math.round((Date.now() - tsMs(o.ts)) / 1000)) : 0; return s > 180 ? Math.floor(s / 60) + ' min' : Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
     function sentAt() { var o = oldestPending(), d = o ? new Date(tsMs(o.ts)) : new Date(); return d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2); } // v61 : heure d'envoi réelle (avant : seule la durée m:ss s'affichait, lue comme une heure)
     function lateNow() { var o = oldestPending(); return !!(o && Date.now() - tsMs(o.ts) > 180000); }
-    var peeked = false;
-    function load() { if (!peeked) { peeked = true; window.DCAP.peek('uiChat', []).then(function (c) { if (c && !C.msgs.length) apply(c); }); } return call('uiChat', null).then(apply).catch(function (e) { console.warn(e); schedule(); }); }
+    var inflight = null, peeked = false;
+    function load() {
+      if (!peeked && window.DCAP && window.DCAP.peek) { peeked = true; window.DCAP.peek('uiChat', []).then(function (c) { if (c && !Object.keys(ST.srv).length) apply(c, 0, true); }).catch(function () {}); }
+      if (inflight && inflight.seq > ST.wseq) return inflight.p;
+      var seq = nextSeq(), p = call('uiChat', null).then(function (r) { apply(r, seq, !!(r && r._cachedAt)); }).catch(function (e) { console.warn(e); schedule(); })
+        .then(function () { if (inflight && inflight.seq === seq) inflight = null; });
+      inflight = { seq: seq, p: p }; return p;
+    }
 
     // v41 : bandeau de contexte retiré (trop de place) ; les suggestions gardent le contexte
     function strip() { suggest(); }
@@ -2263,10 +2318,12 @@
     function answer(mid, picks) {
       var m = C.msgs.filter(function (x) { return x.msg_id === mid; })[0]; if (!m || waiting()) return;
       var g = jparse(m.choices, []), text = choicesText(g, picks);
-      m.picks = JSON.stringify(picks); delete C.qsel[mid];
-      C.sending = true; C.msgs.push({ role: 'user', text: text, ts: etNow(), status: 'pending' }); render(); schedule(); // pas de saut forcé : on reste collé en bas seulement si on y était
-      call('uiAnswerChoices', mid, picks).then(function (r) { C.sending = false; apply(r); })
-        .catch(function (e) { C.sending = false; m.picks = ''; C.msgs.pop(); render(); fail(e); });
+      m.picks = ST.picks[mid] = JSON.stringify(picks); delete C.qsel[mid];
+      var l = { _key: 'm|' + lid(), role: 'user', text: text, ts: etNow(), _ms: Date.now(), status: 'pending', _state: 'sending' };
+      ST.loc.push(l); rebuild(); render(); schedule(); // pas de saut forcé : on reste collé en bas seulement si on y était
+      var seq = ST.wseq = nextSeq();
+      call('uiAnswerChoices', mid, picks).then(function (r) { l._state = 'sent'; l._sentAt = Date.now(); apply(r, seq); })
+        .catch(function (e) { m.picks = ''; delete ST.picks[mid]; var i = ST.loc.indexOf(l); if (i >= 0) ST.loc.splice(i, 1); rebuild(); C.sig = ''; dirty(); render(); fail(e); });
     }
     // ---- demandes d'action (v36) : création d'entraînement Garmin… exécutée par l'assistant après confirmation
     var STEP_LBL = { warmup: 'Échauffement', run: 'Course', interval: 'Effort', recovery: 'Récup', rest: 'Repos', cooldown: 'Retour au calme', other: 'Étape' };
@@ -2300,7 +2357,8 @@
       $$('[data-aok="' + id + '"],[data-ano="' + id + '"]', box).forEach(function (b) { b.disabled = true; });
       btn.textContent = dec === 'confirm' ? 'Envoi…' : '…';
       if (dec === 'decline') { C.sending = true; render(); }
-      call('uiActionDecide', id, dec).then(function (r) { C.sending = false; if (r.action) C.acts[id] = r.action; apply(r); if (dec === 'confirm') toast('Demande envoyée à l\'assistant'); })
+      var seq = ST.wseq = nextSeq();
+      call('uiActionDecide', id, dec).then(function (r) { C.sending = false; if (r.action) C.acts[id] = r.action; apply(r, seq); if (dec === 'confirm') toast('Demande envoyée à l\'assistant'); })
         .catch(function (e) { C.sending = false; C.sig = ''; dirty(); render(); fail(e); });
     }
     function copyBtn(text, id) { id = String(id || text.length); C.copyT[id] = text; return '<div class="cm-foot"><button class="cm-copy" data-copy="' + esc(id) + '">Copier</button></div>'; }
@@ -2308,8 +2366,8 @@
       var t = m.ts ? String(m.ts).slice(11, 16) : '';
       if (m.role === 'user') {
         var mm = String(m.text).match(/^([\s\S]*?)\n\n\[contexte : ([\s\S]*)\]$/), body = mm ? mm[1] : m.text;
-        var st = m.status === 'error' ? 'erreur' : m.status === 'pending' ? (m.queued ? 'en attente réseau' : 'envoyé') : 'lu ✓';
-        return '<div class="cm me"><div class="me-b">' + esc(body) + (m.reaction ? '<span class="me-react" title="Réaction du coach">' + esc(m.reaction) + '</span>' : '') + '</div>' + (mm ? '<div class="me-ctx">↳ ' + esc(mm[2]) + '</div>' : '') + '<div class="me-meta">' + t + ' · ' + st + '</div></div>';
+        var st = m._state === 'sending' ? '<span class="st-snd">envoi…</span>' : m._state === 'queued' ? '<span class="st-q">en attente réseau</span>' : m._state === 'failed' ? '<span class="st-ko">non envoyé</span> <button type="button" class="lnk st-retry" data-retry="' + esc(m._key) + '">Réessayer</button> <button type="button" class="lnk mut" data-drop="' + esc(m._key) + '">Modifier</button>' : m.status === 'error' ? 'erreur' : m.status === 'pending' ? 'envoyé' : 'lu ✓';
+        return '<div class="cm me' + (m._state === 'failed' ? ' ko' : m._state ? ' loc' : '') + '"><div class="me-b">' + esc(body) + (m.reaction ? '<span class="me-react" title="Réaction du coach">' + esc(m.reaction) + '</span>' : '') + '</div>' + (mm ? '<div class="me-ctx">↳ ' + esc(mm[2]) + '</div>' : '') + '<div class="me-meta">' + t + ' · ' + st + '</div></div>';
       }
       if (m.role === 'system') return '<div class="cm sys' + (/erreur/i.test(m.text) ? ' err' : '') + '">' + esc(m.text) + '</div>';
       var p = m.proposal_id && C.props[m.proposal_id], ac = m.action_id && C.acts[m.action_id];
@@ -2337,11 +2395,11 @@
       var items = [];
       C.msgs.forEach(function (m) {
         if (m.role === 'system' && m.proposal_id) return; // la carte suffit
-        items.push({ ts: String(m.ts || ''), k: m.role === 'user' ? 'u|' + m.text : 'm|' + (m.msg_id || m.ts), m: m });
+        items.push({ ts: String(m.ts || ''), ms: m._ms || 0, k: m._key || 'm|' + (m.msg_id || m.ts), m: m });
       });
       var shown = {}; C.msgs.forEach(function (m) { if (m.proposal_id) shown[m.proposal_id] = 1; });
-      ((C.brief && C.brief.debriefs) || []).forEach(function (a) { items.push({ ts: a.date + 'T' + (a.start_time || '12:00'), k: 'd|' + a.activity_id, d: a }); });
-      items.sort(function (x, y) { return x.ts < y.ts ? -1 : x.ts > y.ts ? 1 : 0; });
+      ((C.brief && C.brief.debriefs) || []).forEach(function (a) { var dts = a.date + 'T' + (a.start_time || '12:00'); items.push({ ts: dts, ms: tsMs(dts) || 0, k: 'd|' + a.activity_id, d: a }); });
+      items.sort(function (x, y) { return x.ms - y.ms; }); // v107 : instants réels (fuseaux compris), plus de tri de chaînes
       Object.keys(C.props).forEach(function (id) { var p = C.props[id]; if (!shown[id] && (p.status === 'pending' || C.just === id)) items.push({ ts: '', k: 'p|' + id, p: p }); });
       return items;
     }
@@ -2400,7 +2458,7 @@
       $$('[data-ok="' + id + '"],[data-no="' + id + '"]', box).forEach(function (b) { b.disabled = true; });
       btn.textContent = dec === 'accept' ? 'Validation…' : 'Refus…';
       call('uiDecide', id, dec).then(function (r) {
-        C.props[id] = r.proposal; C.just = id; render();
+        ST.wseq = nextSeq(); C.props[id] = r.proposal; C.just = id; render();
         toast(dec === 'accept' ? 'Plan mis à jour ✓' : 'Proposition refusée');
         load(); loadBrief(true); if (dec === 'accept') { invalidateAll(); if (S.view !== 'detail' && !(MOBILE.matches && C.isOpen)) refresh(); }
       }).catch(function (e) { C.sig = ''; dirty(); render(); fail(e); });
@@ -2410,6 +2468,12 @@
       var legacy = function () { var ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); ok(); } catch (e) { toast('Copie impossible : appui long sur le texte'); } document.body.removeChild(ta); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, legacy); else legacy();
     }
+    // v107 : Réessayer / Modifier sur pointerdown (comme Envoyer) : le clavier reste ouvert, la mise en page ne bouge pas sous le doigt
+    box.addEventListener(window.PointerEvent ? 'pointerdown' : 'touchstart', function (e) {
+      var b = e.target.closest && e.target.closest('[data-retry],[data-drop]'); if (!b || e.button > 0) return;
+      e.preventDefault(); b._pd = Date.now();
+      if (b.hasAttribute('data-retry')) retry(b.getAttribute('data-retry')); else drop(b.getAttribute('data-drop'));
+    }, { passive: false });
     box.addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
       if (b.hasAttribute('data-qo')) {
@@ -2424,6 +2488,7 @@
         if (g2.every(function (x, i) { return s2[i] !== undefined; })) answer(qm2, g2.map(function (x, i) { return s2[i]; }));
         return;
       }
+      if (b.hasAttribute('data-retry') || b.hasAttribute('data-drop')) { if (Date.now() - (b._pd || 0) > 800) { if (b.hasAttribute('data-retry')) retry(b.getAttribute('data-retry')); else drop(b.getAttribute('data-drop')); } return; }
       if (b.hasAttribute('data-aok')) return decideAct(b.getAttribute('data-aok'), 'confirm', b);
       if (b.hasAttribute('data-ano')) return decideAct(b.getAttribute('data-ano'), 'decline', b);
       if (b.hasAttribute('data-ok')) decide(b.getAttribute('data-ok'), 'accept', b);
@@ -2445,13 +2510,32 @@
       input.focus(); try { var L = input.value.length; input.setSelectionRange(L, L); } catch (err) { /* ignore */ }
     });
 
+    // v107 : envoi optimiste avec états clairs : envoi… → envoyé → lu ✓ ; hors ligne : en attente réseau ; échec : Réessayer / Modifier
     function send(text, ref) {
-      C.sending = true;
       var r0 = ref !== undefined && ref !== null ? ref : C.ctx;
-      C.msgs.push({ role: 'user', text: text + (r0 ? '\n\n[contexte : ' + r0 + ']' : ''), ts: etNow(), status: 'pending', queued: !navigator.onLine });
-      setCtx(null); render(true); schedule();
-      call('uiSendChat', text, r0 || null).then(function (r) { C.sending = false; try { if (localStorage.getItem('dcap-chat-draft') === text && !input.value.trim()) localStorage.removeItem('dcap-chat-draft'); } catch (err) {} apply(r); if (r.queued) toast('Hors ligne : message gardé, envoyé dès le retour du réseau', 4500); if (r.error) toast('Erreur xAI : ' + r.error, 6000); if (r.reply && r.reply.proposal) toast('Nouvelle proposition à valider'); })
-        .catch(function (e) { C.sending = false; C.msgs.pop(); render(); input.value = input.value || text; input.dispatchEvent(new Event('input')); fail(e); });
+      var l = { _key: 'm|' + lid(), role: 'user', raw: text, ref: r0 || null, text: text + (r0 ? '\n\n[contexte : ' + r0 + ']' : ''), ts: etNow(), _ms: Date.now(), status: 'pending',
+        _state: navigator.onLine === false ? 'queued' : 'sending' };
+      ST.loc.push(l); setCtx(null); rebuild(); render(true); schedule();
+      push(l);
+    }
+    function push(l) {
+      var seq = ST.wseq = nextSeq(), text = l.raw;
+      call('uiSendChat', text, l.ref).then(function (r) {
+        try { if (localStorage.getItem('dcap-chat-draft') === text && !input.value.trim()) localStorage.removeItem('dcap-chat-draft'); } catch (err) {}
+        if (ST.loc.indexOf(l) >= 0) { l._state = r && r.queued ? 'queued' : 'sent'; l._sentAt = Date.now(); }
+        apply(r, seq);
+        if (r && r.queued) toast('Hors ligne : message gardé, envoyé dès le retour du réseau', 4500);
+        if (r && r.error) toast('Erreur xAI : ' + r.error, 6000); if (r && r.reply && r.reply.proposal) toast('Nouvelle proposition à valider');
+      }).catch(function (e) {
+        console.warn(e); if (ST.loc.indexOf(l) >= 0) l._state = 'failed'; rebuild(); render(); schedule();
+        toast('Message non envoyé : touche « Réessayer »', 5000);
+        setTimeout(load, 2500); // s'il est quand même arrivé au serveur, il sera rattaché tout seul
+      });
+    }
+    function retry(key) { var l = ST.loc.filter(function (x) { return x._key === key; })[0]; if (!l || l._state !== 'failed') return; l._state = 'sending'; l._ms = Date.now(); l.ts = etNow(); rebuild(); render(true); schedule(); push(l); }
+    function drop(key) {
+      var i = -1; ST.loc.forEach(function (x, j) { if (x._key === key) i = j; }); if (i < 0) return; var l = ST.loc.splice(i, 1)[0];
+      rebuild(); render(); schedule(); if (!input.value.trim() && l.raw) { input.value = l.raw; input.dispatchEvent(new Event('input')); }
     }
     function setCtx(c) { C.ctx = c; $('#ctx-chip').style.display = c ? 'flex' : 'none'; $('#ctx-text').textContent = c ? 'À propos de : ' + c : ''; }
     function open(ctx) {
@@ -2520,7 +2604,7 @@
     var sendBtn = $('#chat-send'), DKEY = 'dcap-chat-draft', lastSend = { t: '', at: 0 };
     function trySend(e) {
       if (e) { e.preventDefault(); if (e.stopPropagation) e.stopPropagation(); }
-      var t = input.value.trim(); if (!t || C.sending) return;
+      var t = input.value.trim(); if (!t) return;
       if (t === lastSend.t && Date.now() - lastSend.at < 1500) return;
       lastSend = { t: t, at: Date.now() };
       if (mic.on) { Wrapper.send({ type: 'mic-stop' }); micUi(false); }
@@ -2557,6 +2641,7 @@
       grip.addEventListener('dblclick', function () { setSize(null, null, true); });
       window.addEventListener('resize', function () { if (!MOBILE.matches && chatEl.style.getPropertyValue('--cw')) { var r = chatEl.getBoundingClientRect(); setSize(r.width, r.height, false); } });
     })();
+    window.__chat = { st: ST, C: C }; // v107 : inspection (tests)
     return { open: open, close: close, load: load, focusProps: focusProps };
   })();
 
