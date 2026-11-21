@@ -24,7 +24,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- feuilles externes non bloquantes : l'écran de chargement s'affiche sans les attendre -->
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=IBM+Plex+Mono:wght@400;500;600;700&family=Caveat:wght@600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <style>
 /* =====================================================================
    Styles.html — Thème « Sisyf clair » : parchemin texturé, encre, vert trail,
@@ -1100,6 +1100,258 @@ body.ge-open{overflow:hidden}
 .pd-done b{font-family:var(--head);font-size:18px}.pd-done i{color:var(--muted);font-style:normal}.pd-done .lnk{margin-left:auto}
 .pd-foot{position:sticky;bottom:-18px;margin:4px -18px -18px;padding:10px 18px calc(12px + env(safe-area-inset-bottom));background:var(--parchment);border-top:1px solid var(--line);display:flex;gap:8px}.pd-foot .btn{flex:1}
 @media (max-width:760px){.pd-foot{bottom:calc(-18px - max(env(safe-area-inset-bottom),var(--sab)));margin:4px -16px calc(-18px - max(env(safe-area-inset-bottom),var(--sab)));padding:10px 16px calc(12px + max(env(safe-area-inset-bottom),var(--sab)))}}
+/* =====================================================================
+   v105 : couche design « texture & mouvement » (même identité Sisyf clair).
+   Texture : lumière chaude + grain, cartes papier, profondeur douce. Mouvement : ressorts (linear()),
+   entrée en cascade, compteurs, barres qui se remplissent. Uniquement transform / opacity animés.
+   Tout est coupé si « réduire les animations » (règle globale plus haut + garde JS).
+   ===================================================================== */
+:root{
+  --ease-out:cubic-bezier(.22,1,.36,1); --ease-sheet:cubic-bezier(.32,.72,0,1);
+  --spring:cubic-bezier(.34,1.3,.64,1); --spring-pop:cubic-bezier(.34,1.56,.64,1);
+  --sh-1:0 1px 0 rgba(31,36,34,.05),0 1px 2px rgba(60,45,20,.06);
+  --sh-2:0 1px 0 rgba(31,36,34,.04),0 6px 16px -10px rgba(60,45,20,.30),0 18px 32px -26px rgba(60,45,20,.35);
+  --paper:linear-gradient(180deg,#FFFFFF 0%,#FFFDF8 55%,#FCF8F0 100%);
+  --grain:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.35  0 0 0 0 0.28  0 0 0 0 0.18  0 0 0 .10 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+@supports (transition-timing-function:linear(0,1)){:root{
+  --spring:linear(0, 0.097, 0.298, 0.514, 0.7, 0.839, 0.933, 0.989, 1.017, 1.027, 1.028, 1.023, 1.017, 1.011, 1.006, 1.003, 1.001, 1, 0.999, 0.999, 0.999, 0.999, 1, 1, 1);
+  --spring-pop:linear(0, 0.101, 0.319, 0.561, 0.771, 0.926, 1.023, 1.071, 1.084, 1.075, 1.057, 1.037, 1.019, 1.006, 0.998, 0.994, 0.993, 0.994, 0.995, 0.997, 0.998, 0.999, 1, 1, 1);
+}}
+/* ---- texture : lumière chaude en haut de page, sous le grain (aucun coût au défilement : image de fond fixe dans le document) */
+body{background-image:radial-gradient(90% 520px at 8% 0%,rgba(255,251,240,.75),rgba(255,251,240,0) 70%),radial-gradient(70% 420px at 100% 0%,rgba(232,168,48,.08),rgba(232,168,48,0) 70%),var(--grain);
+  background-repeat:no-repeat,no-repeat,repeat;background-size:100% 900px,100% 900px,160px 160px}
+.topbar{background-image:linear-gradient(180deg,rgba(255,251,240,.55),rgba(255,251,240,0)),var(--grain);background-size:100% 100%,160px 160px;transition:box-shadow 250ms ease}
+body.scrolled .topbar{box-shadow:0 10px 18px -16px rgba(31,36,34,.55)}
+.brand .logo svg{filter:drop-shadow(0 1px 1px rgba(31,36,34,.18))}
+.brand .nm b{text-shadow:0 1px 0 rgba(255,255,255,.7)}
+/* cartes papier : léger dégradé, reflet haut, ombre en deux couches */
+.card{background-color:var(--card);background-image:var(--paper);box-shadow:var(--sh-2),inset 0 1px 0 #fff}
+.chip,.alert,.pd-t{background-image:var(--paper);box-shadow:var(--sh-1)}
+.panel,.pd-desc{background-image:linear-gradient(180deg,rgba(255,255,255,.28),rgba(255,255,255,0)),var(--grain);background-size:100% 100%,160px 160px;box-shadow:inset 0 1px 0 rgba(255,255,255,.5)}
+.prow.cap{box-shadow:var(--sh-1);transition:transform 380ms var(--spring),box-shadow 200ms ease,border-color 200ms ease}
+.prow.cap.is-todo{box-shadow:none}
+/* titres de section : trait doré qui se dessine sous le titre */
+.sec{position:relative}
+.sec:after{content:'';position:absolute;left:0;bottom:-1px;width:34px;height:2px;border-radius:2px;background:var(--gold);transform-origin:left center}
+.sec h2 .n{text-shadow:0 1px 0 rgba(154,110,16,.18)}
+/* barres de progression : dégradé + reflet, piste creusée */
+.bar,.splitbar,.pf-ts,.cs .bar{box-shadow:inset 0 1px 1.5px rgba(31,36,34,.10)}
+.bar>i{background-image:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.28)),linear-gradient(180deg,rgba(255,255,255,.25),rgba(255,255,255,0) 60%);transform-origin:left center}
+.splitbar i,.cs .bar i{transform-origin:left center}
+/* cercles du mois : relief (reflet + ombre portée) */
+.run:not(.planned){background-image:radial-gradient(circle at 32% 26%,rgba(255,255,255,.38),rgba(255,255,255,0) 58%)}
+.run.su-road:not(.planned),.run.su-trail:not(.planned){box-shadow:0 2px 4px -1px rgba(31,36,34,.28),inset 0 -2px 3px rgba(0,0,0,.10)}
+.md.today{background:linear-gradient(180deg,rgba(232,168,48,.10),rgba(232,168,48,0))}
+/* boutons */
+.btn-green{background-image:linear-gradient(180deg,rgba(255,255,255,.20),rgba(255,255,255,0) 55%)}
+.btn-blue,.btn-ghost,.pd-x{box-shadow:var(--sh-1)}
+.seg{box-shadow:var(--sh-1)}
+/* coach : bulles avec profondeur */
+.me-b{box-shadow:0 6px 14px -10px rgba(31,36,34,.6)}
+.pc{box-shadow:0 8px 18px -14px rgba(154,110,16,.45)}
+.sg{transition:transform 320ms var(--spring)}
+/* jour en cours : point doré qui respire (3 fois) */
+.pday.today .pd-date b{position:relative}
+.pday.today .pd-date b:after{content:'';position:absolute;right:-9px;top:3px;width:5px;height:5px;border-radius:50%;background:var(--gold)}
+/* toast : carte sombre arrondie avec ombre */
+#toast{border-radius:11px;box-shadow:0 14px 30px -14px rgba(31,36,34,.6),0 0 0 1px rgba(255,255,255,.06) inset}
+/* chargement : squelette (le texte « Chargement… » reste pour les lecteurs d'écran / scripts) */
+.loading.sk{padding:18px 0 0;text-align:left;display:flex;flex-direction:column;gap:12px}
+.sk-b{display:block;position:relative;overflow:hidden;height:12px;border-radius:6px;background:rgba(217,207,188,.55)}
+.sk-b.h{height:26px;width:52%} .sk-b.t{height:34px;width:38%} .sk-b.w8{width:82%} .sk-b.w6{width:62%} .sk-b.w4{width:42%}
+.sk-c{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--sh-2)}
+.sk-l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);text-align:center;padding-top:4px}
+/* progression de la sync (↻) : fine ligne verte sous l'en-tête */
+.topbar:after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,rgba(61,187,106,0),var(--green) 40%,var(--gold) 60%,rgba(232,168,48,0));transform:translateX(-100%);transition:opacity 300ms ease}
+html:has(#btn-import.spin) .topbar:after{opacity:1;animation:syncLine 1.3s var(--ease-out) infinite}
+@keyframes syncLine{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+@media (max-width:760px){
+  .tabbar{box-shadow:0 -6px 20px -6px rgba(31,36,34,.16),inset 0 1px 0 rgba(255,255,255,.55)}
+  #tab-ind{transition:transform 420ms var(--spring),opacity 150ms}
+  #tab-ind:before{box-shadow:0 1px 8px rgba(61,187,106,.55)}
+  #modal .box{background-image:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0) 120px),var(--grain);background-size:100% 100%,160px 160px;box-shadow:0 -12px 40px -16px rgba(31,36,34,.45)}
+  #modal .box:before{content:'';display:block;width:38px;height:5px;border-radius:3px;background:rgba(31,36,34,.18);margin:-8px auto 10px}
+  #composer{background-image:var(--grain);background-size:160px 160px}
+}
+/* ---------------- mouvement ---------------- */
+@media (prefers-reduced-motion: no-preference){
+  /* entrée en cascade des blocs à l'arrivée sur une vue (classe posée 1,4 s par Motion.enter) */
+  #view.rv .rv-i{animation:rvIn 560ms var(--ease-out) both;animation-delay:calc(var(--rv,0) * 40ms)}
+  #view.rv .sec:after{animation:drawX 700ms var(--ease-out) 120ms both}
+  #view.rv .bar>i,#view.rv .splitbar i,#view.rv .cs .bar i{animation:drawX 900ms var(--ease-out) both;animation-delay:calc(220ms + var(--rv,0) * 40ms)}
+  #view.rv .md .run{animation:popIn 520ms var(--spring-pop) both;animation-delay:calc(var(--d,0) * 11ms + 80ms)}
+  #view.rv .pday.today .pd-date b:after{animation:breathe 1.6s ease-in-out 600ms 3}
+  /* appui : légère compression puis retour en ressort (transform seulement) */
+  .prow.cap[role]:active,.pd-t:active,.cs:active,.rf-go:active,.sg:active{transform:scale(.975);transition:transform 90ms ease-out}
+  .md:active .run{transform:scale(.9);transition:transform 90ms ease-out}
+  .run{transition:transform 380ms var(--spring-pop)}
+  /* onglets : l'icône rebondit quand l'onglet devient actif */
+  .tabbar button.on svg,body.chat-open #tab-coach svg{animation:tabPop 520ms var(--spring-pop)}
+  .tabbar button:active svg{transform:scale(.86);transition:transform 90ms ease-out}
+  .tabbar button svg{transition:transform 380ms var(--spring-pop)}
+  /* témoin hors ligne : apparition en ressort + onde */
+  html.is-offline .net,html.srv-down .net{animation:netIn 560ms var(--spring-pop) both}
+  .net{position:relative}
+  html.is-offline .net:after{content:'';position:absolute;inset:4px;border-radius:50%;border:1.5px solid currentColor;opacity:0;animation:ring 1.6s var(--ease-out) 400ms 2}
+  #btn-import .ri{display:inline-block;transition:transform 500ms var(--spring-pop)}
+  #toast{animation:toastIn 460ms var(--spring) both}
+  /* feuilles du bas : courbe « sheet » d'iOS */
+  #modal.open .box{animation:sheetIn 420ms var(--ease-sheet) both}
+  #modal.closing .box{animation:sheetOut 240ms cubic-bezier(.4,0,1,1) both}
+  /* squelette : reflet qui passe ; apparaît après 120 ms (pas de flash si les données sont déjà là) */
+  .loading.sk{animation:vtFadeIn 240ms ease 120ms both}
+  .sk-b:after{content:'';position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.65),rgba(255,255,255,0));animation:shimmer 1.4s ease-in-out infinite}
+  /* messages du coach : montée en ressort */
+  .cm.fresh{animation:rvIn 460ms var(--ease-out) both}
+  .me.fresh,.fresh .me-b{transform-origin:bottom right}
+}
+@keyframes rvIn{from{opacity:0;transform:translate3d(0,12px,0) scale(.985)}to{opacity:1;transform:none}}
+@keyframes drawX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes popIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+@keyframes tabPop{0%{transform:scale(.82)}100%{transform:none}}
+@keyframes netIn{from{opacity:0;transform:scale(.3) rotate(-25deg)}to{opacity:1;transform:none}}
+@keyframes ring{0%{opacity:.55;transform:scale(.7)}100%{opacity:0;transform:scale(1.6)}}
+@keyframes breathe{0%,100%{transform:none;opacity:1}50%{transform:scale(1.9);opacity:.45}}
+@keyframes shimmer{to{transform:translateX(100%)}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,16px) scale(.96)}to{opacity:1;transform:translate(-50%,0)}}
+.cu{font-variant-numeric:tabular-nums}
+
+/* v105 : courbes de niveau (relief trail) en filigrane dans les cellules vedettes */
+:root{--topo:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200' viewBox='0 0 320 200'><g fill='none' stroke='%23756C5A' stroke-opacity='.13' stroke-width='1'><path d='M276 60 L276 62 L275 63 L274 65 L273 66 L272 67 L270 69 L269 70 L268 71 L267 72 L266 74 L265 75 L263 77 L262 78 L260 80 L257 80 L255 81 L252 80 L250 79 L248 78 L246 77 L244 75 L243 74 L241 74 L239 73 L237 73 L235 74 L232 74 L229 73 L226 73 L223 71 L221 70 L220 68 L220 66 L221 64 L223 62 L224 60 L226 58 L227 57 L228 56 L228 54 L228 52 L228 51 L229 49 L229 47 L231 46 L232 44 L235 44 L237 43 L240 43 L242 44 L244 44 L246 45 L248 45 L250 45 L252 44 L254 43 L256 43 L259 42 L262 42 L264 42 L267 42 L269 43 L271 45 L272 46 L273 48 L274 50 L274 52 L275 53 L275 55 L276 57 L276 58 L276 60Z'/><path d='M301 60 L301 63 L299 66 L297 69 L295 72 L293 75 L290 77 L288 80 L286 82 L284 85 L282 88 L280 92 L277 95 L274 97 L269 99 L265 100 L260 100 L255 99 L250 97 L246 95 L242 92 L239 90 L236 89 L232 88 L228 88 L223 88 L217 89 L211 89 L205 88 L200 86 L195 83 L193 80 L192 76 L193 71 L195 67 L198 63 L201 60 L203 57 L205 54 L206 51 L206 48 L206 45 L206 41 L207 38 L209 34 L211 31 L215 29 L220 28 L225 28 L230 28 L235 29 L239 29 L243 29 L246 29 L250 28 L254 27 L258 25 L263 23 L269 22 L274 22 L279 22 L284 24 L288 26 L292 29 L294 33 L296 36 L297 40 L298 43 L299 47 L300 50 L301 53 L301 57 L301 60Z'/><path d='M326 60 L325 65 L323 70 L320 74 L317 78 L314 82 L310 86 L308 90 L305 94 L302 99 L300 104 L296 109 L291 113 L286 117 L279 119 L272 120 L264 119 L257 117 L250 114 L244 110 L239 107 L234 105 L228 104 L222 104 L215 104 L207 105 L198 106 L189 105 L180 103 L173 100 L167 95 L165 89 L165 83 L167 76 L171 70 L175 65 L179 60 L182 56 L184 51 L184 47 L184 42 L183 37 L183 32 L185 26 L188 21 L193 17 L199 15 L206 13 L213 13 L221 14 L227 14 L233 14 L239 14 L244 12 L250 10 L256 7 L263 4 L271 2 L279 1 L287 1 L295 2 L302 5 L307 9 L312 14 L315 20 L317 25 L319 31 L321 36 L322 41 L324 45 L325 50 L326 55 L326 60Z'/><path d='M350 60 L348 66 L346 72 L342 78 L339 84 L335 89 L331 95 L328 100 L325 107 L322 113 L318 120 L312 126 L306 132 L298 136 L288 138 L278 138 L268 137 L259 133 L250 129 L242 126 L235 122 L228 121 L220 120 L212 121 L201 122 L190 124 L177 124 L165 123 L154 120 L146 114 L140 107 L139 98 L140 90 L144 81 L149 73 L155 66 L159 60 L162 54 L162 49 L162 42 L160 36 L160 29 L160 21 L162 15 L167 9 L174 4 L183 1 L193 -0 L203 -1 L212 -0 L220 -0 L228 -1 L235 -3 L242 -6 L250 -10 L259 -14 L269 -18 L279 -21 L290 -22 L301 -21 L311 -18 L319 -13 L326 -7 L331 0 L334 8 L337 15 L340 22 L342 28 L345 35 L347 41 L349 47 L350 54 L350 60Z'/><path d='M373 60 L371 68 L368 75 L364 83 L360 90 L356 97 L353 104 L349 111 L346 120 L342 128 L336 136 L329 144 L320 150 L309 154 L297 156 L285 156 L272 153 L261 149 L250 144 L240 141 L231 138 L222 137 L212 138 L200 140 L186 143 L171 144 L155 144 L141 141 L128 136 L120 128 L115 118 L115 107 L118 95 L124 85 L130 76 L136 67 L140 60 L141 53 L141 46 L138 38 L136 29 L135 20 L136 11 L140 3 L147 -4 L157 -9 L168 -12 L180 -14 L192 -14 L203 -14 L213 -15 L222 -17 L231 -21 L240 -26 L250 -32 L261 -37 L274 -42 L288 -45 L302 -45 L314 -42 L326 -37 L335 -30 L343 -22 L348 -13 L353 -4 L356 5 L359 13 L363 21 L366 29 L369 36 L372 44 L373 52 L373 60Z'/><path d='M396 60 L394 69 L391 78 L387 87 L383 96 L379 104 L375 114 L372 123 L368 133 L363 143 L356 153 L346 162 L334 168 L321 172 L306 173 L290 172 L276 168 L262 164 L250 159 L239 156 L227 155 L215 156 L202 158 L186 161 L169 164 L150 166 L132 164 L116 159 L104 151 L96 140 L93 127 L95 114 L100 100 L107 88 L114 78 L119 69 L121 60 L120 52 L117 43 L114 33 L110 22 L109 11 L112 1 L118 -9 L127 -16 L140 -22 L154 -25 L168 -26 L182 -27 L194 -29 L205 -31 L216 -35 L226 -41 L237 -48 L250 -56 L264 -62 L280 -67 L297 -69 L313 -68 L328 -63 L340 -56 L351 -46 L358 -36 L364 -25 L369 -14 L374 -4 L378 5 L383 14 L387 23 L391 32 L394 41 L396 51 L396 60Z'/><path d='M419 60 L417 71 L414 81 L410 92 L406 102 L403 113 L399 124 L395 135 L391 147 L384 159 L375 170 L363 179 L348 186 L331 189 L314 189 L296 187 L279 183 L264 178 L250 175 L237 173 L223 173 L208 176 L191 180 L172 185 L151 188 L129 188 L109 184 L93 177 L81 165 L75 151 L74 135 L78 119 L85 105 L92 91 L98 80 L102 70 L101 60 L98 50 L93 39 L87 28 L83 15 L83 2 L87 -10 L96 -20 L108 -28 L124 -34 L140 -37 L156 -39 L171 -41 L185 -44 L197 -48 L208 -55 L221 -63 L234 -72 L250 -81 L268 -88 L286 -93 L305 -93 L324 -90 L340 -83 L353 -73 L364 -61 L372 -48 L379 -35 L385 -24 L390 -13 L396 -2 L402 8 L408 17 L413 28 L417 38 L419 49 L419 60Z'/><path d='M443 60 L441 72 L438 85 L434 97 L431 109 L428 121 L424 135 L420 148 L414 162 L406 175 L394 187 L379 196 L361 203 L341 205 L321 204 L301 201 L283 197 L266 193 L250 191 L235 191 L218 194 L200 199 L179 204 L156 209 L132 211 L108 210 L87 203 L71 193 L61 178 L57 160 L58 142 L64 124 L72 108 L79 94 L83 82 L84 71 L80 60 L73 49 L66 36 L59 22 L55 7 L56 -7 L63 -20 L74 -31 L90 -39 L108 -45 L127 -49 L144 -52 L160 -55 L174 -60 L187 -67 L201 -77 L215 -87 L231 -99 L250 -108 L271 -115 L292 -118 L314 -117 L334 -110 L351 -100 L365 -88 L376 -73 L385 -59 L392 -45 L399 -32 L406 -21 L413 -10 L421 1 L429 12 L436 23 L440 35 L443 47 L443 60Z'/><path d='M467 60 L466 74 L463 88 L460 102 L457 116 L454 131 L451 146 L446 162 L438 177 L427 191 L413 204 L394 213 L373 218 L351 220 L328 218 L306 215 L286 211 L268 209 L250 208 L232 211 L213 216 L191 223 L166 230 L140 235 L113 235 L88 231 L67 221 L52 207 L44 188 L42 168 L46 147 L53 128 L60 111 L66 97 L67 84 L64 72 L56 60 L46 47 L36 32 L29 16 L26 -0 L29 -16 L39 -30 L54 -42 L72 -50 L93 -56 L113 -61 L132 -65 L148 -71 L163 -78 L177 -88 L192 -101 L209 -114 L228 -126 L250 -136 L274 -142 L298 -143 L322 -138 L343 -129 L361 -116 L375 -100 L386 -84 L396 -69 L404 -54 L412 -41 L421 -29 L431 -18 L441 -6 L451 6 L459 19 L464 32 L467 46 L467 60Z'/></g></svg>")}
+.band .cell:first-child,.msum .cell:first-child,.gym-head,.race-flag{background-image:var(--topo);background-repeat:no-repeat;background-position:right -40px top -30px;background-size:320px 200px}
+
+/* v105 : onglet actif = pastille verte douce qui glisse avec l'indicateur ; en-tête du coach texturé */
+@media (max-width:760px){
+  #tab-ind:after{content:'';position:absolute;left:50%;top:5px;width:56px;height:32px;margin-left:-28px;border-radius:16px;background:rgba(61,187,106,.13);box-shadow:inset 0 0 0 1px rgba(61,187,106,.10)}
+  .tabbar button{z-index:1}
+  #chat .ch{background-image:linear-gradient(180deg,rgba(255,251,240,.5),rgba(255,251,240,0)),var(--grain);background-size:100% 100%,160px 160px}
+}
+.band .cell:first-child .bar{height:7px;border-radius:4px}
+/* =====================================================================
+   v106 : « carnet de course » inspiré de Sisyf (sisyf.com) : cartes à ombre d'encre décalée, rubans adhésifs,
+   pastilles numérotées cerclées, point vert final des titres, annotations manuscrites bleues (Caveat),
+   dossard géant pour les km de la semaine, ruban 7 jours, barre d'onglets encre. Toujours transform / opacity animés.
+   ===================================================================== */
+:root{--hard:3px 3px 0 rgba(31,36,34,.86);--hard-s:2px 2px 0 rgba(31,36,34,.78);--edge:rgba(31,36,34,.30);--surface:#F0F0EC;--hand:'Caveat','Segoe Print','Bradley Hand',cursive;--hand-c:#3A7BE0}
+/* cartes : bord d'encre fin + ombre dure décalée (signature Sisyf) */
+.card{border-color:var(--edge);box-shadow:var(--hard),inset 0 1px 0 #fff}
+.mcal-card{box-shadow:var(--hard)}
+.chip,.alert,.pd-t{border-color:var(--edge);box-shadow:var(--hard-s)}
+.btn-ghost,.btn-blue,.pd-x,.seg{border-color:rgba(31,36,34,.34);box-shadow:var(--hard-s)}
+.btn-ghost:active,.btn-blue:active,.pd-x:active{box-shadow:0 0 0 rgba(31,36,34,.8);transform:translate(2px,2px)!important}
+.prow.cap{border-color:rgba(31,36,34,.22)}
+.prow.cap.is-done,.prow.cap.gym.is-done,.prow.cap.cap.is-done[class*=" sp-"]{box-shadow:2px 2px 0 rgba(31,36,34,.16)}
+.race-flag{border:1.5px solid var(--ink);box-shadow:var(--hard)}
+.pc{border-color:var(--ink);box-shadow:var(--hard-s)}
+.cm.card,#chat .cm{box-shadow:var(--hard-s)}
+.mini{box-shadow:var(--hard-s);border-color:var(--edge)!important}
+/* titres : pastille cerclée façon « ① PLAN » + point vert final */
+.sec h2,.pf-head h2{display:flex;align-items:center;gap:10px}
+.sec h2 .n,.pf-head h2 .n{flex:none;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin:0;border:2.5px solid var(--ink);border-radius:50%;
+  font-family:var(--head);font-weight:800;font-size:19px;line-height:1;color:var(--ink);background:#fff;box-shadow:2px 2px 0 var(--gold);text-shadow:none}
+.sec h2:after,.pf-head h2:after{content:'.';color:var(--green);margin-left:-8px}
+.sec{border-bottom:1.5px solid rgba(31,36,34,.16)}
+.sec:after{height:3px;width:46px;bottom:-2px;background:var(--green)}
+.brand .nm b:after{content:'.';color:var(--green)}
+/* ruban adhésif (washi) sur les cartes vedettes */
+.card.band,.card.msum,.gym .gym-head,.race-flag,.pc,.rp-hero{position:relative}
+.card.band:before,.card.msum:before,.gym .gym-head:before,.race-flag:before{content:'';position:absolute;z-index:3;top:-10px;left:22px;width:78px;height:20px;pointer-events:none;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.0) 0 5px,rgba(255,255,255,.35) 5px 7px),rgba(242,214,120,.62);
+  box-shadow:0 1px 2px rgba(31,36,34,.12);transform:rotate(var(--r,-4deg));border-radius:1px;
+  -webkit-mask:linear-gradient(90deg,transparent 0,#000 3px,#000 calc(100% - 3px),transparent 100%);mask:linear-gradient(90deg,transparent 0,#000 3px,#000 calc(100% - 3px),transparent 100%)}
+.card.msum:before{left:auto;right:26px;--r:3deg}
+.race-flag:before{left:auto;right:18px;width:56px;--r:5deg}
+/* dossard : la cellule KM de la semaine devient un dossard (bandeau encre + chiffre géant) */
+.band .cell:first-child{position:relative;padding-top:0!important;overflow:hidden;border-radius:var(--radius) var(--radius) 0 0}
+.band .cell:first-child>.mono-label{display:flex;justify-content:space-between;align-items:center;margin:0 -12px 8px;padding:7px 12px;background:var(--ink);color:#F6F1E6;letter-spacing:.18em;font-weight:600}
+.band .cell:first-child>.mono-label:after{content:'DCAP · ' attr(data-wk);color:var(--gold);letter-spacing:.14em}
+.band .cell:first-child .big{font-size:76px!important;line-height:.9;letter-spacing:-.01em;text-shadow:3px 3px 0 rgba(61,187,106,.22)}
+.band .cell:first-child .big small{font-size:26px;margin-left:6px;letter-spacing:0}
+.band .cell:first-child .bar{height:12px!important;border-radius:6px;border:1.5px solid var(--ink);background:#fff;box-shadow:2px 2px 0 rgba(31,36,34,.7)}
+.band .cell:first-child .bar>i{border-radius:4px;background-color:var(--green);background-image:repeating-linear-gradient(-45deg,rgba(255,255,255,.22) 0 6px,rgba(255,255,255,0) 6px 12px)}
+.big{letter-spacing:-.005em}
+@media (max-width:760px){ .big{font-size:31px} .msum .big{font-size:29px} .band .cell:first-child{padding:0 14px 12px} .band .cell:first-child>.mono-label{margin:0 -14px 8px;padding:7px 14px} }
+/* ruban 7 jours dans le dossard : km faits (plein) et prévus (pointillé) */
+.wr{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;align-items:end;height:66px;margin:12px 0 2px}
+.wr-d{position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
+.wr-c{position:relative;width:100%;flex:1;display:flex;align-items:flex-end;justify-content:center}
+.wr-p,.wr-f{position:absolute;bottom:0;left:12%;right:12%;height:var(--h);border-radius:4px 4px 2px 2px;transform-origin:bottom center}
+.wr-p{border:1.5px dashed rgba(31,36,34,.35);background:rgba(255,255,255,.5)}
+.wr-f{background:var(--green);border:1.5px solid var(--ink);box-shadow:1.5px 1.5px 0 rgba(31,36,34,.8)}
+.wr-f.tr{background:var(--c-trail)} .wr-f.rd{background:var(--road)}
+.wr-d b{font:600 10px/1 var(--mono);color:var(--muted);letter-spacing:.06em}
+.wr-d.today b{color:#fff;background:var(--ink);border-radius:8px;padding:2px 5px}
+.wr-d .gy{position:absolute;top:-2px;left:50%;width:7px;height:7px;margin-left:-3.5px;border-radius:2px;background:var(--gym);border:1px solid var(--gym-d)}
+/* annotations manuscrites (bleu Sisyf) */
+.hand{font-family:var(--hand);font-weight:600;font-style:normal;color:var(--hand-c);font-size:19px;line-height:1;letter-spacing:0;text-transform:none;white-space:nowrap}
+.hand-note{--r:-4deg;position:absolute;right:14px;display:flex;align-items:center;gap:4px;transform:rotate(var(--r));pointer-events:none}
+.hand-note svg{width:26px;height:22px;fill:none;stroke:var(--hand-c);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.band .hand-note{top:46px}
+.band .cell .hand.race{--r:-2deg;display:block;margin-top:4px;transform:rotate(var(--r));transform-origin:left}
+.pday.today .pd-date i{font-family:var(--hand);font-size:17px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--hand-c);transform:rotate(-6deg);transform-origin:left;display:inline-block;margin-top:2px}
+/* Programme : colonne des dates en bandeau gris (en-têtes de cartes Sisyf) */
+.pday{border-top-color:rgba(31,36,34,.12)}
+.pd-date{background:var(--surface);border-right:1px solid rgba(31,36,34,.10)}
+.pday.today .pd-date{background:linear-gradient(180deg,rgba(232,168,48,.20),rgba(232,168,48,.08))}
+.pd-date b{font-size:19px}
+/* mois : cercles « autocollants » */
+.run.su-road:not(.planned),.run.su-trail:not(.planned){border:1.5px solid rgba(31,36,34,.85);box-shadow:1.5px 1.5px 0 rgba(31,36,34,.8)}
+.md.today{background:linear-gradient(180deg,rgba(232,168,48,.20),rgba(232,168,48,.04))}
+.mcal .dh{background:var(--ink);color:#EDE4D2;letter-spacing:.12em}
+/* barre d'onglets encre (mobile) : icônes claires, onglet actif vert */
+@media (max-width:760px){
+  .tabbar{background:rgba(31,36,34,.96);border-top:0;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 -8px 24px -10px rgba(31,36,34,.55),inset 0 1px 0 rgba(255,255,255,.06)}
+  .tabbar button{color:#BDB5A4}
+  .tabbar button.on{color:#fff}
+  .tabbar button.on svg{stroke:#5FE08E} .tabbar button.on svg .f{fill:#5FE08E}
+  body.chat-open #tab-coach{color:#fff} body.chat-open #tab-coach svg{stroke:#5FE08E}
+  body.chat-open .tabbar button[data-nav].on{color:#BDB5A4}
+  #tab-ind:before{background:#5FE08E;box-shadow:0 0 12px rgba(95,224,142,.8)}
+  #tab-ind:after{background:rgba(95,224,142,.16);box-shadow:inset 0 0 0 1px rgba(95,224,142,.22)}
+  .tabbar .badge{border-color:var(--ink)}
+}
+/* légende de la carte : dégradé continu rouge (lent) → vert (rapide) */
+.glegend{display:block;position:relative;margin:8px 6px 4px;font-size:10.5px}
+.gl-bar{position:relative;height:10px;border-radius:5px;border:1.5px solid var(--ink);box-shadow:2px 2px 0 rgba(31,36,34,.7);
+  background:linear-gradient(90deg,rgb(214,69,69),rgb(242,153,74) 25%,rgb(242,201,76) 50%,rgb(164,200,74) 75%,rgb(61,187,106))}
+.glegend .gl-tick{position:absolute;top:-5px;bottom:-5px;height:auto;width:3px;margin-left:-1.5px;background:var(--ink);border-radius:2px;box-shadow:0 0 0 1.5px #fff}
+.gl-lbl{position:relative;height:34px;margin-top:6px}
+.gl-lbl>span{position:absolute;top:0;display:flex;flex-direction:column;gap:1px;line-height:1.1}
+.gl-lbl b{font-family:var(--head);font-weight:800;font-size:17px;color:var(--ink)}
+.gl-lbl small{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.gl-l{left:0;align-items:flex-start} .gl-l b{color:#B23A3A}
+.gl-r{right:0;align-items:flex-end} .gl-r b{color:var(--green-d)}
+.gl-m{transform:translateX(-50%);align-items:center}
+.gl-u{font-size:9.5px;color:var(--muted);letter-spacing:.04em;margin-top:2px}
+.glegend.hr .gl-bar{background:linear-gradient(90deg,rgb(214,69,69),rgb(242,153,74) 25%,rgb(242,201,76) 50%,rgb(164,200,74) 75%,rgb(61,187,106))}
+/* mouvement v106 */
+@media (prefers-reduced-motion: no-preference){
+  #view.rv .card.band:before,#view.rv .card.msum:before,#view.rv .gym-head:before,#view.rv .race-flag:before{animation:tapeIn 620ms var(--spring-pop) 260ms both}
+  #view.rv .wr-f,#view.rv .wr-p{animation:growY 760ms var(--spring) both;animation-delay:calc(240ms + var(--i,0) * 55ms)}
+  #view.rv .hand-note,#view.rv .hand.race{animation:handIn 700ms var(--ease-out) 700ms both}
+  #view.rv .sec h2 .n{animation:badgeIn 560ms var(--spring-pop) both}
+  .prow.cap[role]:active{transform:translate(1px,1px) scale(.985)}
+  .card.band:active .big{transform:scale(.98);transition:transform 90ms ease-out}
+  .band .cell:first-child .big{display:inline-block;transition:transform 380ms var(--spring-pop)}
+}
+@keyframes tapeIn{from{opacity:0;transform:translateY(-14px) rotate(-14deg) scale(1.15)}to{opacity:1;transform:rotate(var(--r,-4deg))}}
+@keyframes growY{from{transform:scaleY(0)}to{transform:none}}
+@keyframes handIn{from{opacity:0;transform:translate(-6px,4px) rotate(-10deg)}to{opacity:1;transform:rotate(var(--r,-4deg))}}
+@keyframes badgeIn{from{transform:scale(.3) rotate(-90deg)}to{transform:none}}
+
+/* v106 : légende des pentes du profil (couleurs Sisyf) */
+.chart-box{position:relative}
+.slope-leg{position:absolute;left:10px;top:8px;display:flex;align-items:center;gap:3px 5px;flex-wrap:wrap;font-size:9.5px;color:var(--ink-2);pointer-events:none;max-width:calc(100% - 20px)}
+.slope-leg span{letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+.slope-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;border:1px solid rgba(31,36,34,.5);margin-left:4px}
+
+/* v106 : exercices numérotés façon Sisyf (① ② …) */
+.gym{counter-reset:gx}
+.gym-ex:not(.gx-ord){counter-increment:gx}
+.gym-ex:not(.gx-ord) .gx-top .gx-name:before{content:counter(gx);display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-right:8px;vertical-align:2px;
+  border:2px solid var(--ink);border-radius:50%;font:800 14px/1 var(--head);background:#fff;box-shadow:1.5px 1.5px 0 var(--gold)}
 </style>
 
 </head>
@@ -1178,18 +1430,18 @@ body.ge-open{overflow:hidden}
   <div id="notif" role="dialog" aria-label="Notifications du coach"><b>🔔 Notifications du coach</b>Reçois une notification quand le coach t'écrit. Toucher la notification ouvre directement le Coach.
     <div class="row"><button type="button" id="notif-later">Plus tard</button><button type="button" class="go" id="notif-go">Activer les notifications</button></div></div>
   <script>
-    window.APP_BUILD = '104-p7'; window.UI_TOKEN = null;
+    window.APP_BUILD = '106-p7'; window.UI_TOKEN = null;
     try { window.BOOT = JSON.parse(localStorage.getItem('dcapb-boot') || 'null'); } catch (e) { window.BOOT = null; }
     window.BOOT_AT = 0; // v103 : copie locale = à revalider dès l'affichage (sinon la semaine restait celle du matin)
   </script>
-  <script src="api.js?b=104-p7"></script>
-  <script src="bridge.js?b=104-p7"></script>
-  <script src="updater.js?b=104-p7"></script>
+  <script src="api.js?b=106-p7"></script>
+  <script src="bridge.js?b=106-p7"></script>
+  <script src="updater.js?b=106-p7"></script>
   <script>
     (function () {
       function etToday() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date()); } catch (e) { return ''; } }
       var started = false;
-      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=104-p7'; document.body.appendChild(s); }
+      function start() { if (started) return; started = true; var s = document.createElement('script'); s.src = 'app.js?b=106-p7'; document.body.appendChild(s); }
       var b = DCAP.boot().then(function (d) { if (!started && d.week) { window.BOOT = d.week; window.BOOT_AT = Date.now(); } });
       if (window.BOOT && window.BOOT.today === etToday()) start(); // cache du jour : affichage immédiat, rafraîchi en fond
       else { b.then(start, start); setTimeout(start, window.BOOT ? 2500 : 15000); } // cache périmé : on attend un peu le serveur

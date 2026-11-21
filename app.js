@@ -76,7 +76,51 @@
     var tv = v === 'detail' || v === 'gym' ? S.from : v === 'race' ? 'graph' : v;
     $$('#tabbar [data-nav]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-nav') === tv); });
   }
-  function loading() { $('#view').innerHTML = '<div class="loading">Chargement…</div>'; }
+  function loading() {
+    $('#view').innerHTML = '<div class="loading sk" role="status" aria-label="Chargement"><i class="sk-b h"></i>' +
+      '<div class="sk-c"><i class="sk-b w4"></i><i class="sk-b t"></i><i class="sk-b w8"></i></div>' +
+      '<div class="sk-c"><i class="sk-b w6"></i><i class="sk-b w8"></i><i class="sk-b w4"></i></div><span class="sk-l">Chargement…</span></div>';
+  }
+  // ------------------------------------------------------------------ v105 : mouvement (entrée en cascade, compteurs)
+  // Armé par chaque navigation (goNow) ; joue UNE fois au premier vrai rendu de la vue (pas aux rafraîchissements en fond).
+  // Transform / opacity uniquement, éléments visibles seulement, rien si « réduire les animations ».
+  var Motion = (function () {
+    var armed = 0, tOff = 0, RV = '.sec, .band .cell, .msum .cell, .chip, .alert, .pday, .race-flag, .mleg, .pf-c, .pf-h, .gym-ex, .stats .cell, .pd-t, .card';
+    function reduced() { return REDUCED.matches || document.hidden; }
+    function visible(el, H) { var r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < H && r.height > 0; }
+    function count(el) {
+      var tn = el.firstChild; if (!tn || tn.nodeType !== 3) return;
+      var s = tn.nodeValue, m = /^(\s*)(\d+)(?:,(\d+))?(\s*)$/.exec(s); if (!m) return;
+      var dec = m[3] ? m[3].length : 0, to = parseFloat(m[2] + (dec ? '.' + m[3] : '')); if (!(to >= 3) || to > 99999) return;
+      var t0 = 0, D = 650 + Math.min(350, to * 4);
+      el.classList.add('cu');
+      function f(t) {
+        if (!t0) t0 = t; var k = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - k, 4);
+        if (!tn.parentNode) return;
+        tn.nodeValue = k >= 1 ? s : m[1] + (to * e).toFixed(dec).replace('.', ',') + m[4];
+        if (k < 1) requestAnimationFrame(f); else el.classList.remove('cu');
+      }
+      tn.nodeValue = m[1] + (0).toFixed(dec).replace('.', ',') + m[4]; requestAnimationFrame(f);
+    }
+    function enter() {
+      var v = $('#view'); if (!v || reduced()) return;
+      var H = window.innerHeight || 800, list = $$(RV).filter(function (el) { return v.contains(el) && visible(el, H); });
+      list = list.filter(function (el) { return !list.some(function (o) { return o !== el && el.contains(o); }); }).slice(0, 16);
+      list.forEach(function (el, i) { el.style.setProperty('--rv', i); el.classList.add('rv-i'); });
+      $$('#view .mcal .md').forEach(function (md, i) { md.style.setProperty('--d', Math.floor(i / 7) * 2 + i % 7); });
+      $$('#view .big, #view .pd-tv, #view .chip .v').forEach(function (el) { if (visible(el, H)) count(el); });
+      v.classList.remove('rv'); void v.offsetWidth; v.classList.add('rv');
+      clearTimeout(tOff); tOff = setTimeout(function () { v.classList.remove('rv'); list.forEach(function (el) { el.classList.remove('rv-i'); }); }, 2000);
+    }
+    if (window.MutationObserver) new MutationObserver(function () {
+      if (!armed) return; if (Date.now() - armed > 20000) { armed = 0; return; }
+      var v = $('#view'); if (!v.firstElementChild || v.querySelector('.loading')) return;
+      armed = 0; requestAnimationFrame(enter);
+    }).observe(document.getElementById('view'), { childList: true });
+    return { arm: function () { armed = Date.now(); }, enter: enter };
+  })();
+  // iOS : active les états :active (retour tactile) sans délai
+  document.addEventListener('touchstart', function () {}, { passive: true });
 
   // ------------------------------------------------------------------ navigation
   // v78 : transitions — onglets = fondu 150 ms ; fiche (sortie, séance, course) = poussée iOS 300 ms ; retour = inverse.
@@ -103,6 +147,7 @@
     destroyCharts();
     if (view === 'week' || view === 'month') S.from = view;
     S.view = view; setNav(view); document.body.classList.remove('panel-open'); rwCleanup();
+    Motion.arm();
     navSave(view, opts);
     if (view === 'week') { if (opts.day !== undefined) S.weekDay = opts.day; loadWeek(); }
     else if (view === 'month') { if (opts.ym) S.ym = opts.ym; loadMonth(); }
@@ -295,6 +340,29 @@
       '<span class="pt">Muscu</span><span class="pm"><span class="ttl">' + esc(kind || 'Séance') + (st === 'missed' ? ' <em class="miss">manquée</em>' : '') + '</span>' +
       (meta ? '<span class="meta ' + (st === 'done' ? 'did' : 'plan') + '">' + meta + '</span>' : '') + '</span><span class="go">' + (p ? '›' : '') + '</span></div>';
   }
+  // v106 : annotation manuscrite du dossard + ruban 7 jours (km faits / prévus par jour)
+  function heroNote(s) {
+    if (!s.target_km) return '';
+    var left = Math.max(0, s.target_km - s.done_km), arrow = '<svg viewBox="0 0 26 22" aria-hidden="true"><path d="M24 3c-6 1-13 5-17 13"/><path d="M4 11l3 6 6-3"/></svg>';
+    var txt = left <= 0.05 ? 'objectif atteint !' : 'encore ' + n(left, left < 10 ? 1 : 0) + ' km';
+    return '<span class="hand-note" aria-hidden="true">' + arrow + '<em class="hand">' + txt + '</em></span>';
+  }
+  function weekRibbon(d) {
+    var L = ['L', 'M', 'M', 'J', 'V', 'S', 'D'], rows = (d.days || []).map(function (day) {
+      var done = 0, trail = 0, plan = 0;
+      (day.acts || []).forEach(function (a) { var k = +a.distance_km || 0; done += k; if (/trail/i.test(a.type)) trail += k; });
+      (day.plans || []).forEach(function (p) { plan += +p.distance_km || +p.distance_max_km || 0; });
+      return { day: day, done: done, trail: trail, plan: plan, gym: (day.strength || []).length + (day.gym || []).length };
+    });
+    if (rows.length !== 7) return '';
+    var mx = Math.max.apply(null, rows.map(function (r) { return Math.max(r.done, r.plan); }).concat([1]));
+    return '<div class="wr" aria-hidden="true">' + rows.map(function (r, i) {
+      var hp = Math.round(r.plan / mx * 100), hf = Math.round(r.done / mx * 100);
+      return '<span class="wr-d' + (r.day.is_today ? ' today' : '') + '" style="--i:' + i + '"><span class="wr-c">' + (r.gym ? '<i class="gy"></i>' : '') +
+        (hp ? '<i class="wr-p" style="--h:' + Math.max(6, hp) + '%;--i:' + i + '"></i>' : '') + (hf ? '<i class="wr-f ' + (r.trail > r.done / 2 ? 'tr' : 'rd') + '" style="--h:' + Math.max(6, hf) + '%;--i:' + i + '"></i>' : '') +
+        '</span><b>' + L[i] + '</b></span>';
+    }).join('') + '</div>';
+  }
   function renderWeek(d, keepScroll) {
     S.last = d; if (!S.today) S.today = d.today;
     var s = d.summary, L = d.load, y = window.scrollY;
@@ -303,18 +371,18 @@
     var projSt = !s.target_km ? '' : (s.projection_km >= s.target_km * 0.95 && s.projection_km <= s.target_km * 1.1 ? 'ok' : (s.projection_km > s.target_km * 1.1 ? 'warn' : 'low'));
     var race = d.next_race, mob = MOBILE.matches, isCur = d.monday === S.curMonday;
     var h = '';
-    h += '<div class="sec"><h2><span class="n">1.</span>Ma semaine</h2><div class="right">' +
+    h += '<div class="sec"><h2><span class="n">1</span>Ma semaine</h2><div class="right">' +
       '<span class="mono-label">S' + d.iso_week.slice(6) + ' · ' + dm(d.monday) + ' → ' + dm(addDays(d.monday, 6)) + '</span>' +
       '<button class="btn btn-ghost btn-sm" data-wk="-7" aria-label="Semaine précédente">‹</button><button class="btn btn-ghost btn-sm' + (isCur ? ' cur' : '') + '" data-wk="0">' + (mob ? 'Auj.' : 'Aujourd\'hui') + '</button><button class="btn btn-ghost btn-sm" data-wk="7" aria-label="Semaine suivante">›</button></div></div>';
     h += '<div class="card band">' +
-      '<div class="cell"><div class="mono-label">Km</div><div class="big">' + n(s.done_km, 1) + '<small>/ ' + (s.target_km ? n(s.target_km, s.target_km % 1 ? 1 : 0) : '–') + '</small></div>' +
-      '<div class="bar"><i style="width:' + pct + '%"></i></div><div class="sub">' + (s.target_km ? s.pct_target + ' % ' + (s.target_source === 'plan' ? 'des km prévus' : 'de la cible') : 'rien de prévu') + '</div></div>' +
+      '<div class="cell"><div class="mono-label" data-wk="S' + d.iso_week.slice(6) + '">Km</div><div class="big">' + n(s.done_km, 1) + '<small>/ ' + (s.target_km ? n(s.target_km, s.target_km % 1 ? 1 : 0) : '–') + '</small></div>' + heroNote(s) +
+      '<div class="bar"><i style="width:' + pct + '%"></i></div><div class="sub">' + (s.target_km ? s.pct_target + ' % ' + (s.target_source === 'plan' ? 'des km prévus' : 'de la cible') : 'rien de prévu') + '</div>' + weekRibbon(d) + '</div>' +
       '<div class="cell"><div class="mono-label">D+</div><div class="big">' + n(s.done_d_plus_m) + '<small>m</small></div>' +
       '<div class="sub">' + (s.target_d_plus_m ? 'cible ' + s.target_d_plus_m + ' m' : '&nbsp;') + '</div></div>' +
       '<div class="cell"><div class="mono-label">Séances</div><div class="big">' + s.sessions_done + '<small>/ ' + s.sessions_planned + '</small></div><div class="sub">faites / prévues</div></div>' +
       '<div class="cell"><div class="mono-label">Projection</div><div class="big ' + (projSt ? 't-' + projSt : '') + '">' + n(s.projection_km, 1) + '<small>km</small></div>' +
       '<div class="sub">' + (s.remaining_km ? 'reste ' + n(s.remaining_km, 1) + ' km prévus' : (s.projection_vs_target_km !== null ? (s.projection_vs_target_km >= 0 ? '+' : '') + n(s.projection_vs_target_km, 1) + ' km vs prévu' : '&nbsp;')) + '</div></div>' +
-      '<div class="cell"><div class="mono-label">Prochaine course</div>' + (race ? '<div class="big">J-' + race.days_left + '</div><div class="sub">' + esc(race.name) + ' · ' + dm(race.date) + ' · ' + esc(race.priority) + '</div>' : '<div class="big">–</div>') + '</div>' +
+      '<div class="cell"><div class="mono-label">Prochaine course</div>' + (race ? '<div class="big">J-' + race.days_left + '</div>' + (race.days_left <= 10 ? '<em class="hand race">' + (race.days_left <= 1 ? 'c\'est le moment !' : race.days_left <= 7 ? 'c\'est bientôt !' : 'ça approche…') + '</em>' : '') + '<div class="sub">' + esc(race.name) + ' · ' + dm(race.date) + ' · ' + esc(race.priority) + '</div>' : '<div class="big">–</div>') + '</div>' +
       '</div>';
     // Indicateurs discrets : ACWR (charge course 7 j / 28 j) + état de l'agenda
     var cal = d.calendar || {};
@@ -324,12 +392,12 @@
         : cal.status === 'unauthorized' ? 'Agenda non autorisé' : 'Agenda pas encore lu') + '</span></div>';
     if (d.alerts.length) h += '<div class="alerts">' + d.alerts.filter(function (a) { return !/^ACWR/.test(a.text) || a.level === 'danger'; }).map(function (a) { return '<div class="alert ' + a.level + '">⚠ <span>' + esc(a.text) + '</span></div>'; }).join('') + '</div>';
     // 2. Programme : jour par jour, prévu (agenda) + réalisé ; course et muscu mêlées dans l'ordre chronologique
-    h += '<div class="sec"><h2><span class="n">2.</span>Programme</h2><div class="right">' +
+    h += '<div class="sec"><h2><span class="n">2</span>Programme</h2><div class="right">' +
       (d.pending_proposals ? '<button class="btn btn-blue btn-sm" id="open-props">' + d.pending_proposals + ' proposition' + (d.pending_proposals > 1 ? 's' : '') + ' à valider</button>' : '') + '</div></div>';
     h += '<div class="prog card">';
     d.days.forEach(function (day) {
       var di = dowIdx(day.date), past = day.date < d.today, pairs = pairDay(day);
-      h += '<div class="pday' + (day.is_today ? ' today' : '') + (past ? ' past' : '') + '"><div class="pd-date"><b>' + DOW[di] + '</b><span>' + dm(day.date) + '</span>' + (day.is_today ? '<i>auj.</i>' : '') + '</div><div class="pd-body">';
+      h += '<div class="pday' + (day.is_today ? ' today' : '') + (past ? ' past' : '') + '"><div class="pd-date"><b>' + DOW[di] + '</b><span>' + dm(day.date) + '</span>' + (day.is_today ? '<i>aujourd\'hui</i>' : '') + '</div><div class="pd-body">';
       day.races.forEach(function (rc) { h += '<div class="race-flag rf-go" data-race="' + esc(rc.name) + '" role="button" tabindex="0">🏁 ' + esc(rc.name) + ' · ' + n(rc.distance_km, 1) + ' km · ' + n(rc.d_plus_m) + ' m D+' + (rc.target_time ? ' · objectif ' + esc(rc.target_time) : '') + '<span class="go">Plan ›</span></div>'; });
       // Toutes les séances du jour (course + muscu) dans l'ordre chronologique (heure réelle, sinon heure prévue).
       var rows = [], seq = 0;
@@ -1754,6 +1822,7 @@
   function renderDetail(d) {
     if (d.sport) return renderSportDetail(d);
     var a = d.activity, sp = d.splits, tr = d.track;
+    S.detailAct = a;
     var h = '<div class="sec"><h2><span class="n">◎</span>' + esc(a.name) + '</h2><div class="right"><span class="mono-label">' + dayLabel(a.date) + ' · ' + esc(a.start_time) + ' · ' + (TYPE_LBL[a.type] || esc(a.type)) + '</span>' +
       '<button class="btn btn-ghost btn-sm" id="back">‹ Retour</button></div></div>';
     var cell = function (l, v, u) { return '<div class="cell"><div class="mono-label">' + l + '</div><div class="big">' + v + (u ? '<small>' + u + '</small>' : '') + '</div></div>'; };
@@ -1762,8 +1831,8 @@
       cell('D+ / D-', '+' + n(a.d_plus_m) + '<small> / -' + n(a.d_minus_m) + '</small>') + cell('Charge', n(a.load)) + '</div>';
     if (d.plan) h += '<div class="panel" style="margin-top:10px"><div class="ttl">Séance prévue · ' + esc(d.plan.type) + '</div>' + esc(d.plan.title || '') +
       (d.plan.structure ? ' · <b>' + esc(d.plan.structure) + '</b>' : '') + (d.plan.hr_target ? ' · FC ' + esc(d.plan.hr_target) : '') + (d.plan.distance_km ? ' · ' + n(d.plan.distance_km, 1) + ' km' : '') + '</div>';
-    h += '<div class="detail-grid"><div class="card chart-box"><canvas id="prof"></canvas></div><div class="card map-card" style="padding:6px"><div id="map"></div>' +
-      '<div class="row" style="justify-content:space-between;padding:6px 4px 2px"><div class="seg"><button data-cb="pace" class="' + (S.colorBy === 'pace' ? 'on' : '') + '">Allure</button><button data-cb="hr" class="' + (S.colorBy === 'hr' ? 'on' : '') + '">FC</button></div><div class="map-legend" id="mleg"></div></div></div></div>';
+    h += '<div class="detail-grid"><div class="card chart-box"><canvas id="prof"></canvas><div class="slope-leg" aria-label="Pente"><span>pente</span>' + ['&lt;5', '5–10', '10–15', '15–25', '&gt;25'].map(function (t, k) { return '<i style="background:' + SLOPE_C[k] + '"></i>' + t; }).join('') + ' %</div></div><div class="card map-card" style="padding:6px"><div id="map"></div>' +
+      '<div class="row" style="justify-content:space-between;padding:6px 4px 2px"><div class="seg"><button data-cb="pace" class="' + (S.colorBy === 'pace' ? 'on' : '') + '">Allure</button><button data-cb="hr" class="' + (S.colorBy === 'hr' ? 'on' : '') + '">FC</button></div></div><div class="map-legend glegend" id="mleg"></div></div></div>';
     // Debrief puis splits (sur téléphone : splits d'abord, voir .detail-tail)
     h += '<div class="detail-tail"><div class="dbf"><div class="sec"><h2><span class="n">✎</span>Debrief</h2><div class="right"><span class="mono-label" title="Valeur Garmin (lecture seule)">RPE ' + (a.rpe ? '<b class="rpe-v">' + esc(a.rpe) + '</b>/10' : '–') + '</span></div></div>';
     h += '<div class="panel"><div class="ttl">' + (d.debrief.from_coach ? 'Debrief coach' : d.debrief.auto ? 'Résumé auto · en attente du debrief coach' : 'Notes') + '</div><div class="debrief cmd">' +
@@ -1785,14 +1854,43 @@
   }
 
   /** Profil altitude (lissée) + FC sur les points bruts du fichier tracks/. */
+  /** v106 : profil coloré par la pente (façon Sisyf) : bandes verticales sous la courbe d'altitude, pente |%| sur ±50 m. */
+  var SLOPE_C = ['#7CB342', '#FBC02D', '#FB8C00', '#E53935', '#7A1416'], SLOPE_T = [5, 10, 15, 25];
+  function slopeClasses(P) {
+    var out = [], lo = 0, hi = 0;
+    for (var i = 0; i < P.length; i++) {
+      while (P[lo][0] < P[i][0] - 50) lo++;
+      while (hi < P.length - 1 && P[hi + 1][0] <= P[i][0] + 50) hi++;
+      var dd = P[hi][0] - P[lo][0], g = dd > 5 ? Math.abs((P[hi][1] - P[lo][1]) / dd * 100) : 0, k = 0;
+      while (k < 4 && g >= SLOPE_T[k]) k++;
+      out.push(k);
+    }
+    return out;
+  }
+  var slopeFill = {
+    id: 'slopeFill',
+    beforeDatasetsDraw: function (chart) {
+      var cls = chart.$slope, meta = chart.getDatasetMeta(0); if (!cls || !meta || !meta.data.length) return;
+      var c = chart.ctx, a = chart.chartArea, pts = meta.data, i = 0;
+      c.save(); c.beginPath(); c.rect(a.left, a.top, a.right - a.left, a.bottom - a.top); c.clip(); c.globalAlpha = .82;
+      while (i < pts.length - 1) {
+        var k = cls[i], j = i; while (j < pts.length - 1 && cls[j] === k) j++;
+        c.beginPath(); c.moveTo(pts[i].x, a.bottom);
+        for (var m = i; m <= j; m++) c.lineTo(pts[m].x, pts[m].y);
+        c.lineTo(pts[j].x, a.bottom); c.closePath(); c.fillStyle = SLOPE_C[k]; c.fill();
+        i = j;
+      }
+      c.restore();
+    }
+  };
   function drawProfile(tr) {
     chartDefaults();
     var P = tr.profile; // [dist_m, ele_lissee, hr, t_s, ele_brute, lat, lon]
     var hasHr = P.some(function (p) { return p[2]; });
-    var ds = [{ label: 'Altitude (m)', data: P.map(function (p) { return { x: p[0] / 1000, y: p[1] }; }), borderColor: '#1F2422', borderWidth: 1.4, backgroundColor: 'rgba(200,144,32,.18)', fill: 'start', pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: '#fff', pointHoverBorderWidth: 2, yAxisID: 'y', tension: 0 }];
+    var ds = [{ label: 'Altitude (m)', data: P.map(function (p) { return { x: p[0] / 1000, y: p[1] }; }), borderColor: '#1F2422', borderWidth: 1.6, backgroundColor: '#7CB342', fill: false, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: '#fff', pointHoverBorderWidth: 2, yAxisID: 'y', tension: 0 }];
     if (hasHr) ds.push({ label: 'FC (bpm)', data: P.map(function (p) { return { x: p[0] / 1000, y: p[2] }; }), borderColor: '#D64545', borderWidth: 1, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: '#fff', pointHoverBorderWidth: 2, yAxisID: 'y2', tension: 0 });
     var c = new Chart($('#prof'), {
-      type: 'line', data: { datasets: ds }, plugins: [hoverLine],
+      type: 'line', data: { datasets: ds }, plugins: [slopeFill, hoverLine],
       options: {
         responsive: true, maintainAspectRatio: false, animation: false, parsing: true, normalized: true,
         interaction: { mode: 'index', intersect: false },
@@ -1806,6 +1904,7 @@
         onHover: function (e, els) { if (els && els.length && S.map) { var p = P[els[0].index]; if (p) S.cursor.setLatLng([p[5], p[6]]).setStyle({ opacity: 1, fillOpacity: 1 }); } }
       }
     });
+    c.$slope = slopeClasses(P); c.draw();
     S.charts.push(c);
   }
   /** Infobulle du profil : au-dessus de la zone tracée, centrée sur le curseur (bornée aux bords), jamais sur la courbe. */
@@ -1866,37 +1965,66 @@
     L.circleMarker([b[0], b[1]], { radius: 6, color: '#fff', weight: 2, fillColor: '#1F2422', fillOpacity: 1 }).addTo(S.map).bindTooltip('Arrivée');
   }
 
-  /** Trace colorée par allure ou FC (5 classes par quantiles de la sortie). */
+  /** v106 : trace en DÉGRADÉ CONTINU (allure ou FC). Tronçons d'environ 20 m, valeur lissée sur ±80 m (moyenne pondérée par la
+      distance), bornée aux percentiles 5–95 de la sortie (pics GPS / arrêts), couleur interpolée rouge (lent / FC haute) → vert
+      (rapide / FC basse). Un seul moteur canvas pour des centaines de petits segments (fluide sur iPhone). */
+  var GRAD = [[214, 69, 69], [242, 153, 74], [242, 201, 76], [164, 200, 74], [61, 187, 106]]; // rouge → vert (= dégradé CSS de la légende)
+  function gradColor(t) {
+    t = Math.max(0, Math.min(1, t)) * (GRAD.length - 1); var k = Math.min(GRAD.length - 2, Math.floor(t)), f = t - k, a = GRAD[k], b = GRAD[k + 1];
+    return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * f) + ',' + Math.round(a[1] + (b[1] - a[1]) * f) + ',' + Math.round(a[2] + (b[2] - a[2]) * f) + ')';
+  }
+  function trackSegments(pts, byPace) {
+    var segs = [], i0 = 0; // pts : [lat, lon, ele, t, hr, dist]
+    for (var i = 1; i < pts.length; i++) {
+      var dd = pts[i][5] - pts[i0][5];
+      if (dd >= 20 || i === pts.length - 1) {
+        var hs = 0, hn = 0; for (var j = i0; j <= i; j++) if (pts[j][4]) { hs += pts[j][4]; hn++; }
+        var dt = pts[i][3] - pts[i0][3];
+        segs.push({ from: i0, to: i, d: Math.max(dd, 0), mid: (pts[i][5] + pts[i0][5]) / 2, dt: dt, v: byPace ? (dd > 0 && dt > 0 ? dt / dd * 1000 : null) : (hn ? hs / hn : null) });
+        i0 = i;
+      }
+    }
+    // lissage ±80 m : allure = Σtemps / Σdistance (robuste) ; FC = moyenne pondérée par la distance
+    var W = 80, lo = 0;
+    segs.forEach(function (s, k) {
+      while (segs[lo].mid < s.mid - W) lo++;
+      var sd = 0, st = 0, sv = 0;
+      for (var m = lo; m < segs.length && segs[m].mid <= s.mid + W; m++) { var g = segs[m]; if (g.v === null) continue; sd += g.d; st += g.dt; sv += g.v * g.d; }
+      s.sv = !sd ? s.v : byPace ? st / sd * 1000 : sv / sd;
+    });
+    return segs;
+  }
   function drawTrack(tr) {
     if (!S.map || !tr) return;
     S.trackLayer.clearLayers();
-    var pts = tr.simplified, segs = [], i0 = 0; // [lat, lon, ele, t, hr, dist]
-    for (var i = 1; i < pts.length; i++) {
-      var dd = pts[i][5] - pts[i0][5];
-      if (dd >= 40 || i === pts.length - 1) {
-        var hrs = []; for (var j = i0; j <= i; j++) if (pts[j][4]) hrs.push(pts[j][4]);
-        var v = S.colorBy === 'pace' ? (dd > 0 ? (pts[i][3] - pts[i0][3]) / dd * 1000 : null) : (hrs.length ? hrs.reduce(function (s, x) { return s + x; }, 0) / hrs.length : null);
-        segs.push({ from: i0, to: i, v: v }); i0 = i;
-      }
-    }
-    var q = quantiles(segs.map(function (s) { return s.v; }), [0.2, 0.4, 0.6, 0.8]);
-    var cls = function (v) {
-      if (v === null || q[0] === null) return 2;
-      var k = 0; for (var t = 0; t < 4; t++) if (v > q[t]) k = t + 1;
-      return S.colorBy === 'pace' ? 4 - k : k; // allure : plus petit = plus intense
-    };
-    var cur = null;
+    var byPace = S.colorBy === 'pace', pts = tr.simplified, segs = trackSegments(pts, byPace);
+    var vals = segs.map(function (s) { return s.sv; }).filter(function (v) { return v !== null && isFinite(v); });
+    if (byPace) vals = vals.filter(function (v) { return v > 120 && v < 1800; }); // 2:00 à 30:00 /km
+    var q = quantiles(vals, [0.05, 0.95]), lo = q[0], hi = q[1];
+    if (lo === null || !(hi > lo)) { lo = lo || 0; hi = lo + 1; }
+    if (!S.trackRenderer || S.trackRenderer._map !== S.map) S.trackRenderer = L.canvas({ padding: 0.4 });
+    var rd = S.trackRenderer;
+    // t = 0 → rouge, t = 1 → vert. Allure : petite valeur (rapide) → vert ; FC : petite valeur (basse) → vert.
     segs.forEach(function (s) {
-      var c = cls(s.v), latlngs = pts.slice(s.from, s.to + 1).map(function (p) { return [p[0], p[1]]; });
-      if (cur && cur.c === c) cur.ll = cur.ll.concat(latlngs.slice(1));
-      else { if (cur) L.polyline(cur.ll, { color: SCALE[cur.c], weight: 4, opacity: .95 }).addTo(S.trackLayer); cur = { c: c, ll: latlngs }; }
+      var latlngs = []; for (var j = s.from; j <= s.to; j++) latlngs.push([pts[j][0], pts[j][1]]);
+      var u = s.sv === null || !isFinite(s.sv) ? 0.5 : (Math.max(lo, Math.min(hi, s.sv)) - lo) / (hi - lo);
+      var t = 1 - u;
+      L.polyline(latlngs, { renderer: rd, color: gradColor(t), weight: 4.5, opacity: 1, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(S.trackLayer);
     });
-    if (cur) L.polyline(cur.ll, { color: SCALE[cur.c], weight: 4, opacity: .95 }).addTo(S.trackLayer);
-    var f = S.colorBy === 'pace' ? function (v) { return pace(v); } : function (v) { return Math.round(v); };
-    var labels = S.colorBy === 'pace'
-      ? ['> ' + f(q[3]), f(q[3]) + '–' + f(q[2]), f(q[2]) + '–' + f(q[1]), f(q[1]) + '–' + f(q[0]), '< ' + f(q[0])]
-      : ['< ' + f(q[0]), f(q[0]) + '–' + f(q[1]), f(q[1]) + '–' + f(q[2]), f(q[2]) + '–' + f(q[3]), '> ' + f(q[3])];
-    $('#mleg').innerHTML = q[0] === null ? '' : SCALE.map(function (c, k) { return '<span><i style="background:' + c + '"></i> ' + labels[k] + '</span>'; }).join('');
+    // légende : barre rouge → vert ; sous la barre, à gauche la valeur « rouge », au centre la moyenne (placée à sa position), à droite la valeur « verte »
+    var a = S.detailAct || {}, mean;
+    if (byPace) mean = a.avg_pace_s_km || (function () { var d = 0, t = 0; segs.forEach(function (s) { if (s.v !== null) { d += s.d; t += s.dt; } }); return d ? t / d * 1000 : null; })();
+    else mean = a.avg_hr || (vals.length ? vals.reduce(function (x, y) { return x + y; }, 0) / vals.length : null);
+    var f = byPace ? function (v) { return pace(v); } : function (v) { return Math.round(v); }, unit = byPace ? '/km' : 'bpm';
+    var pos = mean === null ? 50 : Math.round(100 * (1 - (Math.max(lo, Math.min(hi, mean)) - lo) / (hi - lo)));
+    pos = Math.max(16, Math.min(84, pos));
+    $('#mleg').innerHTML = !vals.length ? '' :
+      '<div class="gl-bar"><i class="gl-tick" style="left:' + pos + '%"></i></div>' +
+      '<div class="gl-lbl"><span class="gl-l"><b>' + f(hi) + '</b><small>' + (byPace ? 'max · lent' : 'max') + '</small></span>' +
+      '<span class="gl-m" style="left:' + pos + '%"><b>' + f(mean) + '</b><small>moyenne</small></span>' +
+      '<span class="gl-r"><b>' + f(lo) + '</b><small>' + (byPace ? 'min · rapide' : 'min') + '</small></span></div>' +
+      '<div class="gl-u">' + (byPace ? 'Allure ' + unit + ' · bornes p5–p95, lissée sur 160 m' : 'FC ' + unit + ' · bornes p5–p95') + '</div>';
+    $('#mleg').classList.toggle('hr', !byPace);
   }
 
   // ------------------------------------------------------------------ CHAT
