@@ -2283,17 +2283,142 @@
       el.classList.toggle('off', !!input.value.trim() || waiting());
     }
 
+    /* PROPVIEW:BEGIN — v108 : carte de proposition visuelle (fonction pure : données → HTML ; testée dans test/run-tests.js) */
+    var PropView = (function () {
+      var DOWS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+      function e(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+      function dow(d) { var p = String(d).split('-'), x = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay(); return DOWS[x === 0 ? 6 : x - 1]; }
+      function fd(d) { return d && /^\d{4}-\d\d-\d\d/.test(d) ? dow(d.slice(0, 10)) + ' ' + d.slice(8, 10) + '/' + d.slice(5, 7) : '—'; }
+      function blank(v) { return v === null || v === undefined || String(v).trim() === '' || v === '∅' || v === 'Ø'; }
+      function num(v) { var x = Number(String(v).replace(',', '.')); return isFinite(x) ? String(Math.round(x * 10) / 10).replace('.', ',') : String(v); }
+      var TYPE = { EF: ['EF', 'ef'], SL: ['SL', 'sl'], 'fractionné': ['Fractionné', 'q'], seuil: ['Seuil', 'q'], fartlek: ['Fartlek', 'q'], 'côtes': ['Côtes', 'q'], 'récup': ['Récup', 'rec'],
+        course: ['Course', 'race'], muscu: ['Muscu', 'gym'], trail: ['Trail', 'sl'], route: ['Route', 'ef'], tapis: ['Tapis', 'ef'], repos: ['Repos', 'rec'], natation: ['Natation', 'rec'], velo: ['Vélo', 'rec'], marche: ['Marche', 'rec'] };
+      var SHORT = { 'fractionné': 'Frac', 'récup': 'Récup', course: 'Race', natation: 'Nage', muscu: 'Gym', fartlek: 'Fartl', marche: 'Marche' };
+      function tchip(t, sh) { var x = TYPE[t] || [t || 'Séance', 'x']; return '<span class="pv-type pt-' + x[1] + '">' + e(sh && SHORT[t] ? SHORT[t] : x[0]) + '</span>'; }
+      // champs du Plan → libellé humain + mise en forme (jamais de clé brute à l'écran)
+      var F = { date: ['Date', fd], type: ['Type', function (v) { return (TYPE[v] || [v])[0]; }], title: ['Nom'], distance_km: ['Distance', function (v) { return num(v) + ' km'; }],
+        duration_min: ['Durée', function (v) { return num(v) + ' min'; }], d_plus_target_m: ['D+', function (v) { return num(v) + ' m'; }], lieu: ['Lieu'], structure: ['Structure'],
+        hr_target: ['FC'], fueling: ['Fueling'], pace_target: ['Allure'], start_time: ['Heure'], status: ['Statut'],
+        distance_min_km: ['Distance min', function (v) { return num(v) + ' km'; }], distance_max_km: ['Distance max', function (v) { return num(v) + ' km'; }] };
+      function fmt(k, v) { if (blank(v)) return '—'; var f = F[k]; return f && f[1] ? f[1](v) : String(v); }
+      function lbl(k) { return F[k] ? F[k][0] : String(k).replace(/_/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); }); }
+      /** Description « Clé : valeur » par ligne → {intro, keys[], map{}} (lignes libres = intro / suite de la clé précédente). */
+      function parseDesc(t) {
+        var out = { intro: [], keys: [], map: {} }, last = null;
+        String(t || '').split(/\r?\n/).forEach(function (l) {
+          l = l.trim(); if (!l) return;
+          var m = l.match(/^([A-Za-zÀ-ÿ+][A-Za-zÀ-ÿ+'’ ./-]{0,22}?)\s*:\s*(.+)$/);
+          if (m && !/^https?$/i.test(m[1])) { var k = m[1].trim(); k = k.charAt(0).toUpperCase() + k.slice(1); if (!out.map[k]) out.keys.push(k); out.map[k] = (out.map[k] ? out.map[k] + ' ' : '') + m[2].trim(); last = k; }
+          else out.intro.push(l);
+        });
+        out.intro = out.intro.join(' ');
+        return out;
+      }
+      /** Diff mot à mot (LCS) : mots retirés barrés, mots ajoutés surlignés, le reste tel quel. */
+      function wdiff(a, b) {
+        var A = String(a).split(/\s+/).filter(Boolean), B = String(b).split(/\s+/).filter(Boolean), n = A.length, m = B.length;
+        if (n * m > 40000) return '<s>' + e(a) + '</s> <ins>' + e(b) + '</ins>';
+        var T = []; for (var i = 0; i <= n; i++) { T.push(new Array(m + 1).fill(0)); }
+        for (i = n - 1; i >= 0; i--) for (var j = m - 1; j >= 0; j--) T[i][j] = A[i].toLowerCase() === B[j].toLowerCase() ? T[i + 1][j + 1] + 1 : Math.max(T[i + 1][j], T[i][j + 1]);
+        var out = [], x = 0, y = 0, push = function (t, w) { var l = out[out.length - 1]; if (l && l.t === t) l.w.push(w); else out.push({ t: t, w: [w] }); };
+        while (x < n && y < m) { if (A[x].toLowerCase() === B[y].toLowerCase()) { push('=', B[y]); x++; y++; } else if (T[x + 1][y] >= T[x][y + 1]) push('-', A[x++]); else push('+', B[y++]); }
+        while (x < n) push('-', A[x++]); while (y < m) push('+', B[y++]);
+        return out.map(function (g) { var t = e(g.w.join(' ')); return g.t === '=' ? t : g.t === '-' ? '<s>' + t + '</s>' : '<ins>' + t + '</ins>'; }).join(' ');
+      }
+      function shared(a, b) { var B = String(b).toLowerCase().split(/\s+/); return String(a).toLowerCase().split(/\s+/).some(function (w) { return w.length > 2 && B.indexOf(w) >= 0; }); }
+      function norm(v) { return String(blank(v) ? '' : v).replace(/\s+/g, ' ').trim().toLowerCase(); }
+      /** Liste des changements réels {label, from, to} : champs structurés puis clés de la description (seulement celles qui diffèrent). */
+      function diff(before, fields) {
+        var rows = [], seen = {};
+        Object.keys(fields || {}).forEach(function (k) {
+          if (k === 'description' || k === 'plan_id') return;
+          var a = before ? before[k] : '', b = fields[k];
+          if (norm(fmt(k, a)) === norm(fmt(k, b))) return;
+          var L = lbl(k); seen[L.toLowerCase()] = 1; rows.push({ label: L, from: fmt(k, a), to: fmt(k, b) });
+        });
+        if (fields && fields.description !== undefined) {
+          var A = parseDesc(before && before.description), B = parseDesc(fields.description), ks = A.keys.slice();
+          B.keys.forEach(function (k) { if (ks.indexOf(k) < 0) ks.push(k); });
+          if (norm(A.intro) !== norm(B.intro)) rows.push({ label: 'Résumé', from: A.intro || '—', to: B.intro || '—', long: true });
+          ks.forEach(function (k) {
+            var a = A.map[k], b = B.map[k]; if (norm(a) === norm(b)) return;
+            if (seen[k.toLowerCase()]) { var r0 = rows.filter(function (r) { return r.label.toLowerCase() === k.toLowerCase(); })[0]; if (r0 && !blank(b)) { r0.note = b; return; } }
+            rows.push({ label: k, from: blank(a) ? '—' : a, to: blank(b) ? '—' : b });
+          });
+        }
+        return rows;
+      }
+      /** Chiffres clés d'une séance (état proposé) en puces : distance, D+, allure, FC, durée. */
+      function metrics(r) {
+        var d = parseDesc(r.description), c = [];
+        var dist = !blank(r.distance_km) ? num(r.distance_km) + ' km' : d.map.Distance; if (dist) c.push(['dist', String(dist).replace(/^(\S+ km).*$/, '$1')]);
+        if (!blank(r.duration_min)) c.push(['dur', num(r.duration_min) + ' min']);
+        var dp = !blank(r.d_plus_target_m) && +r.d_plus_target_m > 0 ? num(r.d_plus_target_m) + ' m' : (d.map['D+'] || '').match(/\d+\s*m/) ? d.map['D+'].match(/\d+\s*m/)[0] : ''; if (dp) c.push(['dp', 'D+ ' + dp]);
+        var pace = !blank(r.pace_target) ? r.pace_target : (d.map.Allure || '').match(/\d:\d\d(\s*(à|-|–)\s*\d:\d\d)?(\/km)?/); if (pace) c.push(['pace', (typeof pace === 'string' ? pace : pace[0]).replace(/\s*(à|-)\s*/, '–')]);
+        var fc = !blank(r.hr_target) ? r.hr_target : (d.map.FC || '').match(/\d{2,3}\s*-\s*\d{2,3}/); if (fc) c.push(['fc', 'FC ' + (typeof fc === 'string' ? fc : fc[0]).replace(/\s+/g, '')]);
+        return c.map(function (x) { return '<span class="pv-m m-' + x[0] + '">' + e(x[1]) + '</span>'; }).join('');
+      }
+      var ICON = { update: ['✎', 'mod', 'Modifier'], add: ['+', 'add', 'Ajouter'], delete: ['−', 'del', 'Supprimer'], move: ['→', 'mov', 'Déplacer'], swap: ['⇄', 'mov', 'Échanger'], set_goal: ['◎', 'goal', 'Objectif'] };
+      function head(op, r, dateHtml, cls) {
+        var ic = ICON[op] || ['•', 'x', ''];
+        return '<div class="pv-hd' + (cls ? ' ' + cls : '') + '"><i class="pv-ic ic-' + ic[1] + '" title="' + e(ic[2]) + '">' + ic[0] + '</i><div class="pv-ttl"><div class="pv-kind"><span>' + e(ic[2]) + '</span>' + (dateHtml || '') + '</div>' +
+          '<div class="pv-name">' + (r ? tchip(r.type) + '<b>' + e(r.title || (TYPE[r.type] || [r.type || 'Séance'])[0]) + '</b>' : '<b>Séance</b>') + '</div></div></div>';
+      }
+      function dchip(d, cls) { return '<span class="pv-date' + (cls ? ' ' + cls : '') + '">' + e(fd(d)) + '</span>'; }
+      function details(desc, md) { if (blank(desc)) return ''; return '<details class="pv-more"><summary>Détails de la séance</summary><div class="pv-desc">' + (md ? md(desc) : e(desc)) + '</div></details>'; }
+      function opBlock(v, md, compact) {
+        var r = v.plan, op = v.op;
+        if (compact) return line(v);
+        if (op === 'update') {
+          var after = {}; Object.keys(r || {}).forEach(function (k) { after[k] = r[k]; }); Object.keys(v.fields || {}).forEach(function (k) { after[k] = v.fields[k]; });
+          var rows = diff(r, v.fields);
+          var h = head(op, after, dchip(after.date)) + '<div class="pv-mets">' + metrics(after) + '</div>';
+          h += rows.length ? '<div class="pv-diff">' + rows.map(function (x) {
+            var inline = x.from !== '—' && x.to !== '—' && (x.long || (String(x.from) + String(x.to)).length > 26 && shared(x.from, x.to));
+            return '<div class="pv-row' + (inline ? ' long' : '') + '"><span class="pv-k">' + e(x.label) + '</span><span class="pv-v">' + (inline ? '<span class="pv-wd">' + wdiff(x.from, x.to) + '</span>' : '<s>' + e(x.from) + '</s><span class="pv-to">' + e(x.to) + '</span>') + (x.note ? '<small class="pv-note">' + e(x.note) + '</small>' : '') + '</span></div>'; }).join('') + '</div>'
+            : '<div class="pv-same">Aucun changement visible sur cette séance.</div>';
+          return '<div class="pv-op op-update">' + h + (v.fields && v.fields.description !== undefined ? details(after.description, md) : '') + '</div>';
+        }
+        if (op === 'add') { var w = v.row || {}; return '<div class="pv-op op-add">' + head(op, w, dchip(w.date)) + '<div class="pv-mets">' + metrics(w) + '</div>' + details(w.description, md) + '</div>'; }
+        if (op === 'delete') return '<div class="pv-op op-del">' + head(op, r, dchip(r && r.date, 'gone'), 'struck') + '</div>';
+        if (op === 'move') return '<div class="pv-op op-move">' + head(op, r, '<span class="pv-dates">' + dchip(r && r.date, 'old') + '<i>→</i>' + dchip(v.date) + '</span>') + '</div>';
+        if (op === 'swap') { var o = v['with']; return '<div class="pv-op op-swap">' + head(op, r, dchip(r && r.date)) + '<div class="pv-swap"><i>⇄</i></div>' + head('swap', o, dchip(o && o.date), 'sub') + '</div>'; }
+        if (op === 'set_goal') {
+          return '<div class="pv-op op-goal"><div class="pv-hd"><i class="pv-ic ic-goal">◎</i><div class="pv-ttl"><div class="pv-kind">Objectif de la semaine</div><div class="pv-name"><b>S' + e(String(v.iso_week || '').slice(-2)) + '</b></div></div>' +
+            '<div class="pv-big"><b>' + e(blank(v.target_km) ? '—' : num(v.target_km)) + '</b> km' + (!blank(v.target_d_plus_m) && +v.target_d_plus_m > 0 ? '<small>D+ ' + e(num(v.target_d_plus_m)) + ' m</small>' : '') + '</div></div></div>';
+        }
+        return '';
+      }
+      // ligne compacte (cartes décidées, ou propositions de plusieurs séances)
+      function line(v) {
+        var r = v.op === 'add' ? v.row || {} : v.plan || {}, ic = ICON[v.op] || ['•', 'x', ''], dd = v.op === 'move' ? fd(r.date) + ' → ' + fd(v.date) : fd(r.date);
+        if (v.op === 'set_goal') return '<li class="pv-li"><i class="pv-ic sm ic-goal">◎</i><span class="pv-lt">Objectif S' + e(String(v.iso_week || '').slice(-2)) + '</span><span class="pv-lm">' + e(blank(v.target_km) ? '—' : num(v.target_km) + ' km') + '</span></li>';
+        var km = !blank(r.distance_km) ? num(r.distance_km) + ' km' : '';
+        if (v.op === 'update' && v.fields && !blank(v.fields.distance_km)) km = num(v.fields.distance_km) + ' km';
+        return '<li class="pv-li' + (v.op === 'delete' ? ' struck' : '') + '"><i class="pv-ic sm ic-' + ic[1] + '">' + ic[0] + '</i><span class="pv-ld">' + e(dd) + '</span>' + tchip(r.type, 1) + '<span class="pv-lt">' + e(r.title || '') + '</span><span class="pv-lm">' + e(km) + '</span></li>';
+      }
+      /** Carte complète. p : {proposal_id, status, preview[], ops_view[], rationale} ; o : {md, just} */
+      function card(p, o) {
+        o = o || {}; if (p.status === 'superseded') return '';
+        var st = p.status === 'pending' ? 'à valider' : p.status === 'accepted' ? 'validée ✓' : 'refusée', ops = p.ops_view, pend = p.status === 'pending';
+        var h = '<div class="pc pv ' + e(p.status) + (o.just ? ' just' : '') + '"><div class="pc-h"><span>Proposition de plan</span><span class="pc-st">' + st + '</span></div>';
+        if (!ops || !ops.length) h += '<ul class="pc-ops">' + (p.preview || []).map(function (l) { return '<li><i class="op">•</i><span>' + e(String(l).replace(/\b[a-z]+(_[a-z]+)+\b/g, function (k) { return lbl(k); }).replace(/[∅Ø]/g, '—')) + '</span></li>'; }).join('') + '</ul>';
+        else if (!pend) h += '<ul class="pv-list">' + ops.map(line).join('') + '</ul>';
+        else {
+          var big = ops.filter(function (v) { return v.op !== 'set_goal'; }), goals = ops.filter(function (v) { return v.op === 'set_goal'; });
+          if (big.length > 3) h += '<ul class="pv-list">' + big.map(line).join('') + '</ul>' + goals.map(function (v) { return opBlock(v, o.md); }).join('');
+          else h += ops.map(function (v) { return opBlock(v, o.md); }).join('');
+        }
+        if (p.rationale && pend) h += '<div class="pv-why"><span class="pv-hand">le mot du coach</span><p>' + e(p.rationale) + '</p></div>';
+        else if (p.rationale) h += '<details class="pv-more"><summary>Pourquoi</summary><p class="pv-whyt">' + e(p.rationale) + '</p></details>';
+        if (pend) h += '<div class="pc-act"><button class="btn btn-green" data-ok="' + e(p.proposal_id) + '">Valider</button><button class="btn btn-ghost" data-no="' + e(p.proposal_id) + '">Refuser</button></div><div class="pc-note">Ton plan ne change que si tu valides.</div>';
+        return h + '</div>';
+      }
+      return { card: card, diff: diff, parseDesc: parseDesc, metrics: metrics, wdiff: wdiff };
+    })();
+    /* PROPVIEW:END */
     // ---- cartes
-    var OPS = [[/^Échanger/, '⇄', ''], [/^Déplacer/, '→', ''], [/^Ajouter/, '+', 'add'], [/^Supprimer/, '−', 'del'], [/^Modifier/, '✎', ''], [/^Objectif/, '◎', '']];
-    function propCard(p) {
-      var st = p.status === 'pending' ? 'à valider' : p.status === 'accepted' ? 'validée ✓' : p.status === 'superseded' ? 'remplacée' : 'refusée';
-      if (p.status === 'superseded') return ''; // v104 : carte remplacée par une plus récente → masquée
-      var h = '<div class="pc ' + esc(p.status) + (C.just === p.proposal_id ? ' just' : '') + '"><div class="pc-h"><span>Proposition de plan</span><span class="pc-st">' + st + '</span></div><ul class="pc-ops">' +
-        (p.preview || []).map(function (l) { var o = OPS.filter(function (x) { return x[0].test(l); })[0] || [0, '•', '']; return '<li><i class="op ' + o[2] + '">' + o[1] + '</i><span>' + esc(l) + '</span></li>'; }).join('') + '</ul>' +
-        (p.rationale ? '<div class="pc-why">' + esc(p.rationale) + '</div>' : '');
-      if (p.status === 'pending') h += '<div class="pc-act"><button class="btn btn-green" data-ok="' + esc(p.proposal_id) + '">Valider</button><button class="btn btn-ghost" data-no="' + esc(p.proposal_id) + '">Refuser</button></div><div class="pc-note">Ton plan ne change que si tu valides.</div>';
-      return h + '</div>';
-    }
+    function propCard(p) { return PropView.card(p, { md: md, just: C.just === p.proposal_id }); } // v108 : carte visuelle (PropView)
     // ---- réponses rapides (v36) : un appui ENVOIE (contrairement aux suggestions) ; plusieurs questions → réponses puis « Envoyer mes réponses »
     function jparse(s, d) { if (!s) return d; if (typeof s !== 'string') return s; try { return JSON.parse(s); } catch (e) { return d; } }
     function choicesText(g, picks) { return g.length === 1 ? g[0].o[picks[0]].value : g.map(function (x, i) { return x.q + ' → ' + x.o[picks[i]].value; }).join('\n'); }
